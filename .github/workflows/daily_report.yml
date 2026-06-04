@@ -1,0 +1,57 @@
+name: NSE Daily Announcements Email Report
+
+on:
+  # Primary trigger: cron-job.org fires workflow_dispatch at 04:30 UTC (= 10:00 IST)
+  # every Tue–Sat. These GHA schedules are fallbacks only.
+  schedule:
+    - cron: "30 4 * * 2-6"   # 04:30 UTC = 10:00 IST — primary GHA fallback
+    - cron: "00 5 * * 2-6"   # 05:00 UTC = 10:30 IST — 30-min fallback
+    - cron: "30 5 * * 2-6"   # 05:30 UTC = 11:00 IST — 1-hour fallback
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  scrape-and-report:
+    name: "10:00 IST daily announcements report"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Scrape announcements, board meetings & corporate actions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python main.py
+
+      - name: Send daily announcements report
+        env:
+          SUPABASE_URL:        ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:        ${{ secrets.SUPABASE_KEY }}
+          SMTP_USER:           ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD:       ${{ secrets.SMTP_PASSWORD }}
+          REPORT_RECIPIENTS:   ${{ secrets.REPORT_RECIPIENTS }}
+          REPORT_SENDER_NAME:  ${{ vars.REPORT_SENDER_NAME || 'BAC Announcements' }}
+          SLACK_WEBHOOK_URL:   ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m reports.daily_announcements_report
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-logs-${{ github.run_id }}
+          path: "*.log"
+          retention-days: 7
