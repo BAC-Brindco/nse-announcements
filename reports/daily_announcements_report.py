@@ -443,7 +443,7 @@ def _build_html(
 ) -> str:
     n_ann = len(ann)
     n_bm  = len(bm.drop_duplicates(subset=["symbol", "meeting_date"])) if not bm.empty else 0
-    n_ca  = len(ca) if not ca else 0
+    n_ca  = len(ca) if not ca.empty else 0
 
     _gen_ist    = generated_at.astimezone(_IST)
     gen_time    = _gen_ist.strftime("%H:%M IST on the ")

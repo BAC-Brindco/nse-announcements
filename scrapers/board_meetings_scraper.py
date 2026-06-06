@@ -43,6 +43,18 @@ _EC_URLS = {
 _SKIP_PURPOSES = {"Board Meeting Intimation"}
 
 
+def _dedup(records: list[dict]) -> list[dict]:
+    """Remove duplicates by (symbol, meeting_date, purpose, source) within the batch."""
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for r in records:
+        key = (r["symbol"], r["meeting_date"], r.get("purpose"), r["source"])
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
 def _parse_bm(row: dict, segment: str, scrape_date: str) -> dict | None:
     symbol  = clean_str(row.get("bm_symbol"))
     purpose = clean_str(row.get("bm_purpose"))
@@ -106,6 +118,7 @@ def scrape_board_meetings(session: NSESession | None = None) -> dict:
         rows = payload if isinstance(payload, list) else []
         logger.info("Board meetings %s: %d raw rows", segment, len(rows))
         records = [r for r in (_parse_bm(row, segment, scrape_date) for row in rows) if r]
+        records = _dedup(records)
         total_fetched += len(records)
         n = bulk_upsert("board_meetings", records,
                         conflict_columns=["symbol", "meeting_date", "purpose", "source"])
@@ -122,6 +135,7 @@ def scrape_board_meetings(session: NSESession | None = None) -> dict:
         rows = payload if isinstance(payload, list) else []
         logger.info("Event calendar %s: %d raw rows", segment, len(rows))
         records = [r for r in (_parse_ec(row, segment, scrape_date) for row in rows) if r]
+        records = _dedup(records)
         total_fetched += len(records)
         n = bulk_upsert("board_meetings", records,
                         conflict_columns=["symbol", "meeting_date", "purpose", "source"])
