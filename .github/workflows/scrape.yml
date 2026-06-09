@@ -1,0 +1,57 @@
+name: NSE Announcements — Intraday Data Scrape
+
+# Runs 5 times per trading day (Mon–Fri) to capture announcements
+# across the full NSE filing window (pre-open through late evening).
+# Upserts are idempotent — safe to run as often as needed.
+#
+# Window coverage (UTC → IST):
+#   03:30 UTC = 09:00 IST  pre-open / overnight filings
+#   05:30 UTC = 11:00 IST  mid-morning session
+#   08:00 UTC = 13:30 IST  post-lunch
+#   10:30 UTC = 16:00 IST  end of trading session
+#   13:00 UTC = 18:30 IST  after-hours / late filings
+
+on:
+  schedule:
+    - cron: "30 3  * * 1-5"   # 09:00 IST — pre-open
+    - cron: "30 5  * * 1-5"   # 11:00 IST — mid-session
+    - cron: "00 8  * * 1-5"   # 13:30 IST — post-lunch
+    - cron: "30 10 * * 1-5"   # 16:00 IST — EOD
+    - cron: "00 13 * * 1-5"   # 18:30 IST — late filings
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  scrape:
+    name: "NSE data scrape"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Scrape announcements, board meetings & corporate actions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python main.py
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-logs-${{ github.run_id }}
+          path: "*.log"
+          retention-days: 3

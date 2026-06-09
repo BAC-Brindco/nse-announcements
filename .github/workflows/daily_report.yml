@@ -1,22 +1,19 @@
 name: NSE Daily Announcements Report
 
+# Runs once per trading-day morning (Tue–Sat) at 10:00 IST.
+# Scrapes the latest data then sends the daily email report.
+#
+# Primary trigger: cron-job.org fires workflow_dispatch at 04:30 UTC (10:00 IST).
+# The three GHA schedules below are fallbacks — _claim_slot() idempotency
+# ensures only one email is sent even if multiple triggers fire close together.
+#
+# Intraday data collection is handled separately by scrape.yml (5× per day).
+
 on:
-  # ── Morning: scrape + email report (10:00 IST = 04:30 UTC, Tue–Sat) ──────────
-  # Primary trigger: cron-job.org fires workflow_dispatch at 04:30 UTC.
-  # The three GHA schedules below are fallbacks only — _claim_slot() idempotency
-  # prevents duplicate emails if more than one trigger fires.
-  #
-  # ── Evening: scrape only (4:30 PM IST = 11:00 UTC, Mon–Fri) ─────────────────
-  # Captures the day's announcements so tomorrow morning's report is complete.
-  # The report step exits cleanly (slot already claimed) on these evening runs.
   schedule:
-    # Morning triggers (Tue–Sat — report covers previous trading day)
     - cron: "30 4 * * 2-6"   # 04:30 UTC = 10:00 IST — primary GHA fallback
     - cron: "00 5 * * 2-6"   # 05:00 UTC = 10:30 IST — 30-min fallback
     - cron: "30 5 * * 2-6"   # 05:30 UTC = 11:00 IST — 1-hour fallback
-    # Evening triggers (Mon–Fri — scrape only, captures today's data)
-    - cron: "00 11 * * 1-5"  # 11:00 UTC = 4:30 PM IST
-    - cron: "30 11 * * 1-5"  # 11:30 UTC = 5:00 PM IST — 30-min fallback
   workflow_dispatch:
 
 env:
@@ -24,7 +21,7 @@ env:
 
 jobs:
   scrape-and-report:
-    name: "NSE announcements scrape & report"
+    name: "10:00 IST daily announcements report"
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
