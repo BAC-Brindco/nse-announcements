@@ -63,7 +63,7 @@ _NIFTY50 = frozenset({
     "DRREDDY", "JSWSTEEL", "TATASTEEL", "ADANIENT", "ADANIPORTS", "CIPLA", "DIVISLAB",
     "APOLLOHOSP", "TRENT", "AMBUJACEM", "SBICARD", "BPCL", "COALINDIA", "HINDALCO",
     "GRASIM", "EICHERMOT", "HEROMOTOCO", "BAJAJ-AUTO", "INDUSINDBK", "HDFCLIFE",
-    "BRITANNIA", "SHRIRAMFIN",
+    "BRITANNIA", "SHRIRAMFIN", "M&M",
 })
 
 # ─── NIFTY100 members NOT in NIFTY50 ─────────────────────────────────────────
@@ -74,14 +74,67 @@ _NIFTY100_ONLY = frozenset({
     "ICICIPRULI", "HDFCAMC", "BANDHANBNK", "FEDERALBNK", "IDFCFIRSTB", "PNB",
     "BANKBARODA", "CANFINHOME", "MUTHOOTFIN", "CHOLAFIN", "GAIL", "IOC",
     "HINDPETRO", "ATGL", "APLAPOLLO", "JKCEMENT", "SHREECEM", "TATACOMM",
-    "MCDOWELL-N", "LTIM", "PERSISTENT", "DMART", "ZOMATO",
+    "MCDOWELL-N", "LTIM", "PERSISTENT", "DMART", "ZOMATO", "ETERNAL",
     "PAYTM", "NYKAA", "POLICYBZR", "IRCTC", "HAL", "BEL", "RVNL",
+    # Portfolio additions
+    "ADANIGREEN", "INDUSTOWER", "JSWENERGY", "TVSMOTOR", "VBL",
+    "TATAPOWER", "POLYCAB", "NMDC", "CGPOWER", "MAZDOCK", "GRSE",
 })
 
-# ─── BAC active coverage universe ─────────────────────────────────────────────
+# ─── BAC active coverage universe (full portfolio — 52 holdings) ──────────────
 _BAC_ACTIVE = frozenset({
-    "MANKIND", "HPL", "HFCL", "GENU", "POWERINDIA", "TATAMOTORS", "ZYDUSLIFE",
-    "OSWAL", "TRIVENI", "JSWENERGY", "NETWEB",
+    "ACUTAAS",    # Acutaas Chemicals
+    "ADANIGREEN", # Adani Green Energy
+    "ADANIPOWER", # Adani Power
+    "AFFLE",      # Affle (India)
+    "ATHER",      # Ather Energy
+    "BSE",        # BSE
+    "BAJAJ-AUTO", # Bajaj Auto
+    "BEL",        # Bharat Electronics
+    "BHARTIARTL", # Bharti Airtel
+    "BLUESTONE",  # BlueStone Jewellery & Lifestyle
+    "CGPOWER",    # CG Power & Industrial Solutions
+    "CEMINDIA",   # Cemindia Projects
+    "CHALET",     # Chalet Hotels
+    "CIPLA",      # Cipla
+    "COFORGE",    # Coforge
+    "DATAPATTNS", # Data Patterns (India)
+    "EICHERMOT",  # Eicher Motors
+    "EMMVEE",     # Emmvee Photovoltaic Power
+    "ETERNAL",    # Eternal (formerly Zomato parent)
+    "FORCEMOT",   # Force Motors
+    "FRACTAL",    # Fractal Analytics
+    "FUJIYAMA",   # Fujiyama Power Systems
+    "GRSE",       # Garden Reach Shipbuilders
+    "HFCL",       # HFCL
+    "HAL",        # Hindustan Aeronautics
+    "INDUSTOWER", # Indus Towers
+    "JSWENERGY",  # JSW Energy
+    "LT",         # Larsen & Toubro
+    "LLOYDSME",   # Lloyds Metals & Energy
+    "M&M",        # Mahindra & Mahindra
+    "MAZDOCK",    # Mazagon Dock Shipbuilders
+    "MUTHOOTFIN", # Muthoot Finance
+    "NMDC",       # NMDC
+    "NTPC",       # NTPC
+    "NETWEB",     # Netweb Technologies
+    "NIPPONLIFE", # Nippon Life India AMC
+    "PERSISTENT", # Persistent Systems
+    "POLYCAB",    # Polycab India
+    "PREMIERENE", # Premier Energies
+    "RRKABEL",    # RR Kabel
+    "RELIANCE",   # Reliance Industries
+    "SKIPPER",    # Skipper
+    "TVSMOTOR",   # TVS Motor
+    "TATAPOWER",  # Tata Power
+    "THYROCARE",  # Thyrocare Technologies
+    "TRITURBINE", # Triveni Turbines
+    "WABAG",      # VA Tech Wabag
+    "VBL",        # Varun Beverages
+    "WAAREEENER", # Waaree Energies
+    "WAAREERTL",  # Waaree Renewable Technologies
+    "YATHARTH",   # Yatharth Hospital
+    "ZYDUSLIFE",  # Zydus Lifesciences
 })
 
 # ─── Announcement category priority ──────────────────────────────────────────
