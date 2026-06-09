@@ -46,7 +46,13 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python main.py
+        run: python main.py --datasets announcements board_meetings corporate_actions
+
+      - name: Scrape bhavcopy (EOD prices — runs on all windows, idempotent)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python main.py --datasets bhavcopy
 
       - name: Upload logs on failure
         if: failure()

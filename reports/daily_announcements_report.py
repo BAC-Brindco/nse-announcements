@@ -183,6 +183,54 @@ def _purpose_color(purpose: str) -> str:
     return _INK
 
 
+# ─── Debt symbol detection ────────────────────────────────────────────────────
+
+def _normalize_name(name: str) -> str:
+    """Normalize a company name for fuzzy matching."""
+    s = str(name).upper()
+    for suffix in [
+        " LIMITED", " LTD.", " LTD", " PRIVATE", " PVT.", " PVT",
+        " COMPANY", " CORPORATION", " CORP.", " CORP",
+        " BANK", " FINANCE", " FINANCIAL", " CAPITAL",
+        " INDUSTRIES", " INDUSTRY", " ENTERPRISES", " TECHNOLOGIES",
+        " TECHNOLOGY", " SOLUTIONS", " SERVICES", " INDIA",
+        " (INDIA)", " HOLDINGS", " VENTURES",
+    ]:
+        s = s.replace(suffix, "")
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
+def _build_name_map(ann: pd.DataFrame) -> dict[str, str]:
+    """Build normalized company_name → symbol from equities/SME data."""
+    if ann.empty:
+        return {}
+    eq = ann[(ann["segment"] != "debt") & ann["symbol"].notna() & ann["company_name"].notna()]
+    result: dict[str, str] = {}
+    for _, row in eq.iterrows():
+        key = _normalize_name(str(row["company_name"]))
+        if key and len(key) > 3:
+            result[key] = str(row["symbol"])
+    return result
+
+
+def _detect_symbol(company_name: str, name_map: dict[str, str]) -> str | None:
+    """Try to find NSE symbol for a company name via exact then partial match."""
+    if not company_name or not name_map:
+        return None
+    norm = _normalize_name(company_name)
+    if not norm:
+        return None
+    # Exact match
+    if norm in name_map:
+        return name_map[norm]
+    # Substring match — norm is contained in a longer key or vice versa
+    for key, sym in name_map.items():
+        if len(norm) >= 5 and (norm in key or key in norm):
+            return sym
+    return None
+
+
 # ─── Index / badge helpers ────────────────────────────────────────────────────
 
 def _nifty_badge(symbol: str) -> str:
@@ -867,92 +915,130 @@ def _bac_coverage_panel(
 </table>"""
 
 
-# ─── Next Trading Session panel ───────────────────────────────────────────────
+# ─── Next 3 Trading Sessions panel ───────────────────────────────────────────
 
-def _next_session_panel(
-    today: date,
+def _next_trading_days(from_date: date, n: int = 3) -> list[date]:
+    """Return the next n trading days after from_date."""
+    from utils import is_trading_day
+    days: list[date] = []
+    d = from_date + timedelta(days=1)
+    while len(days) < n:
+        if is_trading_day(d):
+            days.append(d)
+        d += timedelta(days=1)
+    return days
+
+
+def _next_sessions_html(
     bm_filings: pd.DataFrame,
     ec: pd.DataFrame,
     ca: pd.DataFrame,
+    next_days: list[date],
 ) -> str:
-    next_day, skipped_weekend = _next_trading_day(today)
-    next_day_iso = next_day.isoformat()
+    if not next_days:
+        return ""
 
-    next_day_label = f"{next_day.strftime('%A')}, {next_day.day} {next_day.strftime('%b')}"
-    weekend_note = " · weekend skip" if skipped_weekend else ""
+    day_labels = [f"{d.strftime('%A')} {d.day} {d.strftime('%b')}" for d in next_days]
+    subtitle = " · ".join(day_labels)
 
     table_rows: list[str] = []
+    headline_events: list[str] = []
 
-    # Board meetings on next_day
-    if not bm_filings.empty:
-        for _, row in bm_filings.iterrows():
-            if str(row.get("meeting_date") or "") == next_day_iso:
-                sym = str(row.get("symbol") or "")
-                purpose = str(row.get("purpose") or "")
-                badge = _nifty_badge(sym)
-                table_rows.append(
-                    f'<tr>'
-                    f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                    f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">Board Mtg</td>'
-                    f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
-                    f'{_e(sym)}{badge}</td>'
-                    f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                    f'color:{_INK_SOFT};">{_e(purpose)}</td>'
-                    f'</tr>'
-                )
+    for day in next_days:
+        day_iso = day.isoformat()
+        day_label = f"{day.strftime('%A')}, {day.day} {day.strftime('%b')}"
+        day_rows: list[str] = []
 
-    # Event calendar on next_day
-    if not ec.empty:
-        for _, row in ec.iterrows():
-            if str(row.get("meeting_date") or "") == next_day_iso:
-                sym = str(row.get("symbol") or "")
-                purpose = str(row.get("purpose") or "")
-                badge = _nifty_badge(sym)
-                table_rows.append(
-                    f'<tr>'
-                    f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                    f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">Event</td>'
-                    f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
-                    f'{_e(sym)}{badge}</td>'
-                    f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                    f'color:{_INK_SOFT};">{_e(purpose)}</td>'
-                    f'</tr>'
-                )
+        # Board meetings on this day
+        if not bm_filings.empty:
+            for _, row in bm_filings.iterrows():
+                if str(row.get("meeting_date") or "") == day_iso:
+                    sym = str(row.get("symbol") or "")
+                    purpose = str(row.get("purpose") or "")
+                    badge = _nifty_badge(sym)
+                    day_rows.append(
+                        f'<tr>'
+                        f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">'
+                        f'{_e(day_label)}</td>'
+                        f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">Board Mtg</td>'
+                        f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
+                        f'{_e(sym)}{badge}</td>'
+                        f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_INK_SOFT};">{_e(purpose)}</td>'
+                        f'</tr>'
+                    )
+                    if sym in _NIFTY50 or sym in _NIFTY100_ONLY or "FUND RAIS" in purpose.upper() or "DELIST" in purpose.upper():
+                        headline_events.append(f"{sym} · {purpose} ({day.strftime('%d %b')})")
 
-    # Corporate actions ex on next_day
-    if not ca.empty:
-        for _, row in ca.iterrows():
-            if str(row.get("ex_date") or "") == next_day_iso:
-                sym = str(row.get("symbol") or "")
-                subject = str(row.get("subject") or "")
-                badge = _nifty_badge(sym)
-                s_up = subject.upper()
-                subj_style = f"color:{_BURGUNDY}; font-weight:600;" if "RIGHTS" in s_up else f"color:{_INK_SOFT};"
-                table_rows.append(
-                    f'<tr>'
-                    f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                    f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">Corp Action</td>'
-                    f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
-                    f'{_e(sym)}{badge}</td>'
-                    f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
-                    f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                    f'{subj_style}">{_e(subject)}</td>'
-                    f'</tr>'
-                )
+        # Event calendar on this day
+        if not ec.empty:
+            for _, row in ec.iterrows():
+                if str(row.get("meeting_date") or "") == day_iso:
+                    sym = str(row.get("symbol") or "")
+                    purpose = str(row.get("purpose") or "")
+                    badge = _nifty_badge(sym)
+                    day_rows.append(
+                        f'<tr>'
+                        f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">'
+                        f'{_e(day_label)}</td>'
+                        f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">Event</td>'
+                        f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
+                        f'{_e(sym)}{badge}</td>'
+                        f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_INK_SOFT};">{_e(purpose)}</td>'
+                        f'</tr>'
+                    )
+                    if sym in _NIFTY50 or sym in _NIFTY100_ONLY or "FINANCIAL RESULTS" in purpose.upper() or "FUND RAIS" in purpose.upper():
+                        headline_events.append(f"{sym} · {purpose} ({day.strftime('%d %b')})")
+
+        # Corporate actions ex on this day
+        if not ca.empty:
+            for _, row in ca.iterrows():
+                if str(row.get("ex_date") or "") == day_iso:
+                    sym = str(row.get("symbol") or "")
+                    subject = str(row.get("subject") or "")
+                    badge = _nifty_badge(sym)
+                    s_up = subject.upper()
+                    subj_style = f"color:{_BURGUNDY}; font-weight:600;" if "RIGHTS" in s_up else f"color:{_INK_SOFT};"
+                    day_rows.append(
+                        f'<tr>'
+                        f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">'
+                        f'{_e(day_label)}</td>'
+                        f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">Corp Action</td>'
+                        f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
+                        f'{_e(sym)}{badge}</td>'
+                        f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
+                        f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+                        f'{subj_style}">{_e(subject)}</td>'
+                        f'</tr>'
+                    )
+                    if sym in _NIFTY50 or sym in _NIFTY100_ONLY or "RIGHTS" in s_up:
+                        headline_events.append(f"{sym} · {subject} ({day.strftime('%d %b')})")
+
+        table_rows.extend(day_rows)
 
     if table_rows:
         session_table = (
             f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
             f'<thead><tr>'
-            f'{_th("Type")}{_th("Symbol")}{_th("Event")}'
+            f'{_th("Date")}{_th("Type")}{_th("Symbol")}{_th("Event")}'
             f'</tr></thead>'
             f'<tbody>{"".join(table_rows)}</tbody>'
             f'</table>'
@@ -960,8 +1046,20 @@ def _next_session_panel(
     else:
         session_table = (
             f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:12px; '
-            f'color:{_STONE}; font-style:italic;">No scheduled events for this session.</div>'
+            f'color:{_STONE}; font-style:italic;">No scheduled events across the next 3 sessions.</div>'
         )
+
+    # Headlines summary
+    if headline_events:
+        top3 = headline_events[:3]
+        hl_parts = " · ".join(f'<strong>{_e(e)}</strong>' for e in top3)
+        headlines_html = (
+            f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:12px; '
+            f'color:{_INK_SOFT}; margin-top:12px; line-height:1.5; font-style:italic;">'
+            f'Headlines: {hl_parts}.</div>'
+        )
+    else:
+        headlines_html = ""
 
     return f"""
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -972,12 +1070,13 @@ def _next_session_panel(
         <div style="padding-bottom:8px;">
           <span style="font-family:'Times New Roman',Times,serif; font-size:10.5px;
             letter-spacing:0.26em; text-transform:uppercase; color:{_BURGUNDY}; font-weight:600;">
-            Next Trading Session</span>
+            Next 3 Sessions</span>
           <span style="font-family:'Times New Roman',Times,serif; font-size:12px;
-            color:{_STONE}; font-style:italic; margin-left:10px;">{next_day_label}{weekend_note}</span>
+            color:{_STONE}; font-style:italic; margin-left:10px;">{subtitle}</span>
         </div>
         <div style="border-top:1px solid {_TAN}; margin-bottom:14px;"></div>
         {session_table}
+        {headlines_html}
       </td></tr>
     </table>
   </td></tr>
@@ -986,9 +1085,11 @@ def _next_session_panel(
 
 # ─── Top Movers Overlay panel ─────────────────────────────────────────────────
 
-def _top_movers_panel(ann: pd.DataFrame) -> str:
+def _top_movers_panel(ann: pd.DataFrame, prices: dict[str, dict] | None = None) -> str:
     overlay_cats = {"Financial Results", "Integrated Filing- Financial",
                     "Analysts/Institutional Investor Meet/Con. Call Updates"}
+    if prices is None:
+        prices = {}
     if not ann.empty:
         mask = (
             ann["category"].isin(overlay_cats)
@@ -999,15 +1100,16 @@ def _top_movers_panel(ann: pd.DataFrame) -> str:
         sub = pd.DataFrame()
 
     n_total = len(sub)
+    n_with_prices = sum(1 for _, r in sub.iterrows() if str(r.get("symbol") or "") in prices) if n_total > 0 else 0
 
     if n_total > 0:
         intro = (
             f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:12.5px; '
             f'color:{_INK}; line-height:1.6; margin-bottom:10px;">'
             f'Cross-reference result: {n_total} announcement symbol{"s" if n_total != 1 else ""} '
-            f'tagged for price overlay.</div>'
+            f'tagged for price overlay — {n_with_prices} of {n_total} have price data.</div>'
         )
-        price_note = (
+        price_note = "" if n_with_prices > 0 else (
             f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:12px; '
             f'color:{_STONE}; font-style:italic; margin-bottom:12px;">'
             f'Price data pending bhavcopy — all cells show &#8212; until batch runs.</div>'
@@ -1021,6 +1123,23 @@ def _top_movers_panel(ann: pd.DataFrame) -> str:
                 f'<span style="font-size:9px; color:{_STONE}; border:1px solid {_TAN}; '
                 f'padding:1px 4px; margin-left:5px;">{_e(seg.upper())}</span>'
             ) if seg == "sme" else ""
+
+            p = prices.get(sym, {})
+            close = p.get("close")
+            prev_close = p.get("prev_close")
+            vol = p.get("volume")
+
+            close_str = f"&#8377;{close:,.1f}" if close else "&#8212;"
+
+            if close and prev_close and prev_close > 0:
+                chg = (close - prev_close) / prev_close * 100
+                chg_color = _OLIVE if chg >= 0 else _BURGUNDY
+                chg_str = f'<span style="color:{chg_color};">{chg:+.1f}%</span>'
+            else:
+                chg_str = "&#8212;"
+
+            vol_str = f"{vol/1e5:.1f}L" if vol else "&#8212;"
+
             table_rows_html += (
                 f'<tr>'
                 f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
@@ -1031,20 +1150,20 @@ def _top_movers_panel(ann: pd.DataFrame) -> str:
                 f'color:{_INK_SOFT};">{_e(cat)}</td>'
                 f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
                 f'font-family:\'Times New Roman\',Times,serif; font-size:12px; '
-                f'color:{_STONE}; text-align:right;">&#8212;</td>'
+                f'color:{_INK}; text-align:right;">{close_str}</td>'
                 f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
                 f'font-family:\'Times New Roman\',Times,serif; font-size:12px; '
-                f'color:{_STONE}; text-align:right;">&#8212;</td>'
+                f'text-align:right;">{chg_str}</td>'
                 f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
                 f'font-family:\'Times New Roman\',Times,serif; font-size:12px; '
-                f'color:{_STONE}; text-align:right;">&#8212;</td>'
+                f'color:{_STONE}; text-align:right;">{vol_str}</td>'
                 f'</tr>'
             )
         overlay_table = (
             f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
             f'<thead><tr>'
             f'{_th("Symbol")}{_th("Filing")}'
-            f'{_th("Close", "right")}{_th("&#916;%", "right")}{_th("Vol/ADV", "right")}'
+            f'{_th("Close", "right")}{_th("&#916;%", "right")}{_th("Volume", "right")}'
             f'</tr></thead>'
             f'<tbody>{table_rows_html}</tbody>'
             f'</table>'
@@ -1318,7 +1437,7 @@ def _corporate_actions_html(df: pd.DataFrame) -> str:
     )
 
 
-def _announcements_html(df: pd.DataFrame, categories: set[str]) -> str:
+def _announcements_html(df: pd.DataFrame, categories: set[str], name_map: dict | None = None) -> str:
     if df.empty:
         return (
             f'<p style="color:{_STONE}; font-style:italic; '
@@ -1337,6 +1456,8 @@ def _announcements_html(df: pd.DataFrame, categories: set[str]) -> str:
     for _, row in sub.head(60).iterrows():
         symbol  = str(row.get("symbol") or "")
         company = str(row.get("company_name") or "")
+        if not symbol and name_map:
+            symbol = _detect_symbol(company, name_map) or ""
         cat     = str(row.get("category") or "")
         summary = str(row.get("summary") or "")
         seg     = str(row.get("segment") or "")
@@ -1378,6 +1499,38 @@ def _announcements_html(df: pd.DataFrame, categories: set[str]) -> str:
     )
 
 
+# ─── Price fetch ─────────────────────────────────────────────────────────────
+
+def _fetch_prices(symbols: list[str], as_of_date: date, lookback: int = 7) -> dict[str, dict]:
+    """Fetch most recent close, prev_close, volume for symbols within lookback days.
+
+    Uses the latest available bhavcopy date rather than requiring an exact match,
+    so the report works even when the most recent bhavcopy is a day or two behind.
+    """
+    if not symbols:
+        return {}
+    from database.client import get_client
+    from_date = as_of_date - timedelta(days=lookback)
+    client = get_client()
+    resp = (
+        client.table("daily_prices")
+        .select("symbol,close,prev_close,volume,value_cr,trade_date")
+        .gte("trade_date", from_date.isoformat())
+        .lte("trade_date", as_of_date.isoformat())
+        .eq("series", "EQ")
+        .in_("symbol", symbols)
+        .order("trade_date", desc=True)
+        .execute()
+    )
+    # Keep only the most recent row per symbol
+    result: dict[str, dict] = {}
+    for r in (resp.data or []):
+        sym = r["symbol"]
+        if sym not in result:
+            result[sym] = r
+    return result
+
+
 # ─── Full HTML assembly ───────────────────────────────────────────────────────
 
 def _build_html(
@@ -1388,9 +1541,12 @@ def _build_html(
     ca: pd.DataFrame,
     generated_at: datetime,
     today: date | None = None,
+    prices: dict[str, dict] | None = None,
 ) -> str:
     if today is None:
         today = report_date
+    if prices is None:
+        prices = {}
 
     n_ann = len(ann)
     n_bm  = len(bm_filings)
@@ -1433,6 +1589,9 @@ def _build_html(
                 n_rights += 1
     ca_net = f"{n_divs} dividend ex-dates · {n_rights} rights" if n_ca else ""
 
+    # Build name map for debt symbol detection
+    name_map = _build_name_map(ann)
+
     # Section HTML
     bm_html      = _bm_table_enhanced(bm_filings)
     ec_html      = _ec_table_enhanced(ec)
@@ -1442,13 +1601,15 @@ def _build_html(
     debt_html    = _announcements_html(
         ann[ann["segment"] == "debt"] if not ann.empty and "segment" in ann.columns else ann,
         set(),
+        name_map=name_map,
     )
 
     # New panels
     editorial_html   = _build_editorial(report_date, ann, bm_filings, ec, ca)
     bac_panel_html   = _bac_coverage_panel(ann, bm_filings, ec, ca)
-    session_html     = _next_session_panel(today, bm_filings, ec, ca)
-    movers_html      = _top_movers_panel(ann)
+    next_days        = _next_trading_days(today, 3)
+    session_html     = _next_sessions_html(bm_filings, ec, ca, next_days)
+    movers_html      = _top_movers_panel(ann, prices=prices)
     separator_html   = _underlying_filings_separator()
 
     return f"""<!doctype html>
@@ -1561,7 +1722,7 @@ def _build_html(
   <!-- BAC COVERAGE TOUCHPOINTS -->
   {bac_panel_html}
 
-  <!-- NEXT TRADING SESSION -->
+  <!-- NEXT 3 TRADING SESSIONS -->
   {session_html}
 
   <!-- TOP MOVERS OVERLAY -->
@@ -1877,7 +2038,7 @@ def _fetch_corporate_actions(from_date: date, to_date: date) -> pd.DataFrame:
 
 def main(report_date_override: date | None = None, preview_path: str | None = None) -> int:
     from dotenv import load_dotenv
-    from utils import today_ist, previous_trading_day
+    from utils import today_ist, previous_trading_day, is_trading_day
 
     load_dotenv()
     logging.basicConfig(
@@ -1911,7 +2072,16 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
             len(ann), len(bm_filings), len(ec), len(ca),
         )
 
-        html = _build_html(report_date, ann, bm_filings, ec, ca, generated_at, today=today)
+        # Fetch prices for key announcement symbols
+        movers_syms: list[str] = []
+        if not ann.empty:
+            key_ann = ann[ann["category"].isin(_HIGH_PRIORITY | _MEDIUM_PRIORITY)]
+            if "symbol" in key_ann.columns:
+                movers_syms = [s for s in key_ann["symbol"].dropna().unique().tolist() if s]
+        prices = _fetch_prices(movers_syms, today) if movers_syms else {}
+        logger.info("Fetched prices for %d/%d movers symbols", len(prices), len(movers_syms))
+
+        html = _build_html(report_date, ann, bm_filings, ec, ca, generated_at, today=today, prices=prices)
 
         if preview_mode:
             with open(preview_path, "w", encoding="utf-8") as fh:
