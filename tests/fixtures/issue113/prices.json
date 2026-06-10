@@ -1,0 +1,466 @@
+[
+  {
+    "symbol": "WANBURY",
+    "close": 265.75,
+    "prev_close": 252.4,
+    "volume": 196704,
+    "value_cr": 5.2,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "TENNIND",
+    "close": 585.5,
+    "prev_close": 575.9,
+    "volume": 393631,
+    "value_cr": 23.01,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "SKYGOLD",
+    "close": 513.05,
+    "prev_close": 492.25,
+    "volume": 977294,
+    "value_cr": 49.88,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "SIYSIL",
+    "close": 628.85,
+    "prev_close": 605.95,
+    "volume": 109681,
+    "value_cr": 6.89,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "SASKEN",
+    "close": 2314.4,
+    "prev_close": 2131.5,
+    "volume": 89443,
+    "value_cr": 20.01,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "SALASAR",
+    "close": 6.82,
+    "prev_close": 6.81,
+    "volume": 2209418,
+    "value_cr": 1.51,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "POWERICA",
+    "close": 482.25,
+    "prev_close": 496.6,
+    "volume": 252561,
+    "value_cr": 12.25,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "PFS",
+    "close": 31.42,
+    "prev_close": 31.13,
+    "volume": 2199823,
+    "value_cr": 6.97,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "PERSISTENT",
+    "close": 5018.0,
+    "prev_close": 5065.0,
+    "volume": 438124,
+    "value_cr": 220.2,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "PCBL",
+    "close": 283.9,
+    "prev_close": 280.0,
+    "volume": 421683,
+    "value_cr": 11.91,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "OSWALPUMPS",
+    "close": 401.6,
+    "prev_close": 396.3,
+    "volume": 331647,
+    "value_cr": 13.37,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "MOL",
+    "close": 47.98,
+    "prev_close": 47.23,
+    "volume": 274124,
+    "value_cr": 1.31,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "MKPL",
+    "close": 4.92,
+    "prev_close": 4.91,
+    "volume": 85148,
+    "value_cr": 0.04,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "MEGASTAR",
+    "close": 296.65,
+    "prev_close": 301.3,
+    "volume": 5612,
+    "value_cr": 0.17,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "M&M",
+    "close": 2990.1,
+    "prev_close": 2966.0,
+    "volume": 2527267,
+    "value_cr": 757.4,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "KMEW",
+    "close": 1959.8,
+    "prev_close": 1884.0,
+    "volume": 73702,
+    "value_cr": 14.22,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "JSLL",
+    "close": 602.35,
+    "prev_close": 614.25,
+    "volume": 1720796,
+    "value_cr": 103.48,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "INTELLECT",
+    "close": 751.9,
+    "prev_close": 722.0,
+    "volume": 503191,
+    "value_cr": 37.33,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "HARIOMPIPE",
+    "close": 427.55,
+    "prev_close": 405.35,
+    "volume": 670943,
+    "value_cr": 28.57,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "GUJRAFFIA",
+    "close": 41.2,
+    "prev_close": 41.53,
+    "volume": 3285,
+    "value_cr": 0.01,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "GODREJPROP",
+    "close": 1684.3,
+    "prev_close": 1654.6,
+    "volume": 351928,
+    "value_cr": 58.85,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "FEDERALBNK",
+    "close": 315.1,
+    "prev_close": 304.6,
+    "volume": 14386417,
+    "value_cr": 449.29,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "DIGIDRIVE",
+    "close": 18.75,
+    "prev_close": 18.3,
+    "volume": 14119,
+    "value_cr": 0.03,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "BLUESTARCO",
+    "close": 1570.8,
+    "prev_close": 1552.2,
+    "volume": 248363,
+    "value_cr": 38.81,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "BLSE",
+    "close": 231.23,
+    "prev_close": 227.53,
+    "volume": 195683,
+    "value_cr": 4.52,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "BELRISE",
+    "close": 234.73,
+    "prev_close": 215.72,
+    "volume": 35598970,
+    "value_cr": 820.68,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "ANURAS",
+    "close": 1267.2,
+    "prev_close": 1302.0,
+    "volume": 179657,
+    "value_cr": 23.14,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "ALLCARGO",
+    "close": 9.0,
+    "prev_close": 8.61,
+    "volume": 4816626,
+    "value_cr": 4.33,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "ALKYLAMINE",
+    "close": 1851.4,
+    "prev_close": 1788.8,
+    "volume": 265276,
+    "value_cr": 48.93,
+    "trade_date": "2026-06-09"
+  },
+  {
+    "symbol": "WANBURY",
+    "close": 252.4,
+    "prev_close": 262.3,
+    "volume": 108024,
+    "value_cr": 2.78,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "TENNIND",
+    "close": 575.9,
+    "prev_close": 589.05,
+    "volume": 352614,
+    "value_cr": 20.48,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "SKYGOLD",
+    "close": 492.25,
+    "prev_close": 528.45,
+    "volume": 2480081,
+    "value_cr": 125.01,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "SIYSIL",
+    "close": 605.95,
+    "prev_close": 615.65,
+    "volume": 103756,
+    "value_cr": 6.33,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "SASKEN",
+    "close": 2131.5,
+    "prev_close": 2181.2,
+    "volume": 49750,
+    "value_cr": 10.77,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "SALASAR",
+    "close": 6.81,
+    "prev_close": 6.95,
+    "volume": 1406329,
+    "value_cr": 0.97,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "POWERICA",
+    "close": 496.6,
+    "prev_close": 499.8,
+    "volume": 148804,
+    "value_cr": 7.45,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "PFS",
+    "close": 31.13,
+    "prev_close": 30.88,
+    "volume": 1114295,
+    "value_cr": 3.49,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "PERSISTENT",
+    "close": 5065.0,
+    "prev_close": 5038.5,
+    "volume": 396122,
+    "value_cr": 199.46,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "PCBL",
+    "close": 280.0,
+    "prev_close": 289.15,
+    "volume": 420989,
+    "value_cr": 11.88,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "OSWALPUMPS",
+    "close": 396.3,
+    "prev_close": 412.7,
+    "volume": 485334,
+    "value_cr": 19.53,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "MOL",
+    "close": 47.23,
+    "prev_close": 48.77,
+    "volume": 308407,
+    "value_cr": 1.47,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "MKPL",
+    "close": 4.91,
+    "prev_close": 4.93,
+    "volume": 136101,
+    "value_cr": 0.07,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "MEGASTAR",
+    "close": 301.3,
+    "prev_close": 308.45,
+    "volume": 2224,
+    "value_cr": 0.07,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "M&M",
+    "close": 2966.0,
+    "prev_close": 3040.5,
+    "volume": 2415904,
+    "value_cr": 718.71,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "KMEW",
+    "close": 1884.0,
+    "prev_close": 1842.3,
+    "volume": 69966,
+    "value_cr": 13.22,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "JSLL",
+    "close": 614.25,
+    "prev_close": 629.85,
+    "volume": 2963897,
+    "value_cr": 185.31,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "INTELLECT",
+    "close": 722.0,
+    "prev_close": 745.95,
+    "volume": 326763,
+    "value_cr": 24.01,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "HARIOMPIPE",
+    "close": 405.35,
+    "prev_close": 422.45,
+    "volume": 293979,
+    "value_cr": 12.05,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "GUJRAFFIA",
+    "close": 41.53,
+    "prev_close": 42.5,
+    "volume": 1583,
+    "value_cr": 0.01,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "GODREJPROP",
+    "close": 1654.6,
+    "prev_close": 1708.3,
+    "volume": 506107,
+    "value_cr": 84.59,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "FEDERALBNK",
+    "close": 304.6,
+    "prev_close": 304.15,
+    "volume": 12112735,
+    "value_cr": 370.6,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "DIGIDRIVE",
+    "close": 18.3,
+    "prev_close": 18.36,
+    "volume": 24080,
+    "value_cr": 0.04,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "BLUESTARCO",
+    "close": 1552.2,
+    "prev_close": 1581.8,
+    "volume": 468770,
+    "value_cr": 73.46,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "BLSE",
+    "close": 227.53,
+    "prev_close": 229.68,
+    "volume": 553288,
+    "value_cr": 12.68,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "BELRISE",
+    "close": 215.72,
+    "prev_close": 215.98,
+    "volume": 2398230,
+    "value_cr": 52.0,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "ANURAS",
+    "close": 1302.0,
+    "prev_close": 1328.2,
+    "volume": 216171,
+    "value_cr": 28.29,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "ALLCARGO",
+    "close": 8.61,
+    "prev_close": 8.8,
+    "volume": 1897905,
+    "value_cr": 1.65,
+    "trade_date": "2026-06-08"
+  },
+  {
+    "symbol": "ALKYLAMINE",
+    "close": 1788.8,
+    "prev_close": 1775.3,
+    "volume": 143062,
+    "value_cr": 25.79,
+    "trade_date": "2026-06-08"
+  }
+]
