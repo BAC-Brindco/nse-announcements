@@ -6,6 +6,8 @@ Usage:
   python main.py --datasets announcements board_meetings       # specific
   python main.py --datasets bhavcopy                          # prices only
   python main.py --bhavcopy-date 2026-06-06                   # specific date
+  python main.py --datasets announcements --from-date 2026-08-01 --to-date 2026-08-18
+                                                              # backfill a window
 """
 
 import argparse
@@ -44,21 +46,45 @@ def main() -> int:
         "--bhavcopy-date", metavar="YYYY-MM-DD",
         help="Override trade date for bhavcopy scrape",
     )
+    parser.add_argument(
+        "--from-date", metavar="YYYY-MM-DD",
+        help="Announcements window start (default: today - ANNOUNCEMENTS_LOOKBACK_DAYS)",
+    )
+    parser.add_argument(
+        "--to-date", metavar="YYYY-MM-DD",
+        help="Announcements window end (default: today IST)",
+    )
+    parser.add_argument(
+        "--lookback-days", type=int, metavar="N",
+        help="Announcements trailing lookback in days (ignored if --from-date given)",
+    )
     args = parser.parse_args()
 
     from scrapers.nse_session import NSESession
     session = NSESession()
 
+    from datetime import date
+
     bhavcopy_kwargs = {}
     if args.bhavcopy_date:
-        from datetime import date
         bhavcopy_kwargs["trade_date"] = date.fromisoformat(args.bhavcopy_date)
+
+    ann_kwargs = {}
+    if args.from_date:
+        ann_kwargs["from_date"] = date.fromisoformat(args.from_date)
+    if args.to_date:
+        ann_kwargs["to_date"] = date.fromisoformat(args.to_date)
+    if args.lookback_days is not None:
+        ann_kwargs["lookback_days"] = args.lookback_days
 
     errors = []
     for name in args.datasets:
         logger.info("Scraping: %s", name)
         try:
-            kwargs = bhavcopy_kwargs if name == "bhavcopy" else {}
+            kwargs = {
+                "bhavcopy":      bhavcopy_kwargs,
+                "announcements": ann_kwargs,
+            }.get(name, {})
             result = _run(name, session, **kwargs)
             logger.info("%s done: %s", name, result)
         except Exception:  # noqa: BLE001
