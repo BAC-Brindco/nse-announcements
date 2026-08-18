@@ -1,0 +1,37 @@
+name: Keepalive — prevent schedule auto-disable
+
+# GitHub disables *all* scheduled workflows in a repository after 60 days
+# with no commit activity. On 2026-08-11 that silently killed both
+# scrape.yml and daily_report.yml; the outage went unnoticed for 5 trading
+# days because a disabled workflow looks completely healthy in the UI.
+#
+# Note that workflow_dispatch does NOT count as activity — the cron-job.org
+# trigger was firing daily right up to the shutdown and did not prevent it.
+# Only a commit resets the clock, which is what this workflow provides.
+#
+# This runs monthly, so it also keeps itself alive with ~2x margin.
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"   # 06:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    name: "Reset the 60-day inactivity clock"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Push an empty commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive — reset Actions inactivity clock"
+          git push

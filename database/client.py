@@ -19,6 +19,16 @@ def get_client() -> Client:
 def bulk_upsert(table: str, records: list[dict], conflict_columns: list[str]) -> int:
     if not records:
         return 0
+
+    # Postgres' ON CONFLICT DO UPDATE rejects a statement that targets the same
+    # row twice, so a single batch must not carry duplicate conflict keys. Source
+    # feeds (e.g. NSE's debt announcements) can repeat a key within one response;
+    # collapse to the last occurrence (latest-wins) before sending.
+    deduped: dict[tuple, dict] = {}
+    for r in records:
+        deduped[tuple(r.get(c) for c in conflict_columns)] = r
+    records = list(deduped.values())
+
     client = get_client()
     chunk_size = 500
     total = 0
