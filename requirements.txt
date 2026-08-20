@@ -5,3 +5,9 @@ pytz>=2024.1
 tenacity>=8.2.0
 curl_cffi>=0.6.0
 requests>=2.31.0
+PyYAML>=6.0
+# PDF attachment. Chromium renders the same HTML the email uses, on both Windows
+# and Linux, so local previews match CI output. WeasyPrint is a lighter
+# alternative (see reports/attachments/pdf.py) but needs GTK/Pango, which is not
+# present on a stock Windows box.
+playwright>=1.40.0

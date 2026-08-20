@@ -5,3 +5,7 @@ __pycache__/
 .DS_Store
 *.html
 *.pdf
+
+# Generated previews and attachment artifacts
+previews/
+*.zip

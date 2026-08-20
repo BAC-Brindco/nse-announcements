@@ -463,3 +463,235 @@ def group_debt_rows(rows):
         })
     out.sort(key=lambda g: (-g["count"], g["issuer"].upper()))
     return out
+
+
+# ─── Body-filter primitives (tiered-email restructure) ─────────────────────────
+#
+# Everything below supports the split between the curated email body and the
+# unfiltered PDF/CSV attachments. All of it is pure: assembly decides *whether*
+# to apply a rule, these functions decide *what the rule says*.
+
+
+def category_matches(category, patterns) -> bool:
+    """Case-insensitive membership test for an NSE category.
+
+    NSE is not consistent about casing — the feed carries both ``Credit Rating``
+    and ``Credit rating`` as distinct category strings on the same day. Exact
+    set membership therefore silently drops one of them, which is what the
+    original _MEDIUM_PRIORITY set did. Compare casefolded.
+    """
+    c = clean_cell(category).casefold()
+    if not c:
+        return False
+    return any(c == clean_cell(p).casefold() for p in patterns)
+
+
+def category_contains(category, needles) -> bool:
+    """True when the category contains any needle (casefolded substring)."""
+    c = clean_cell(category).casefold()
+    if not c:
+        return False
+    return any(clean_cell(n).casefold() in c for n in needles)
+
+
+# A filing whose entire summary just restates "Outcome of Board Meeting" carries
+# no information the section header doesn't already give. NSE wraps these in
+# boilerplate ("X has informed the Exchange regarding ..."), so strip the
+# wrapper before testing the remainder.
+_WRAPPER_RE = re.compile(
+    r"^\s*.{0,80}?\b(?:has\s+informed\s+the\s+Exchange\s+(?:regarding|about)|"
+    r"has\s+submitted\s+to\s+the\s+Exchange[,]?)\s*",
+    re.IGNORECASE,
+)
+_OUTCOME_ONLY_RE = re.compile(
+    r"^\s*(?:the\s+)?outcome\s+of\s+(?:the\s+)?board\s+meeting"
+    r"(?:\s+held\s+on\b[^.]{0,40})?\s*[.]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_payload_free_outcome(summary) -> bool:
+    """True for 'Outcome of Board Meeting held on <date>.' rows with no content."""
+    s = clean_cell(summary)
+    if not s:
+        return True
+    stripped = _WRAPPER_RE.sub("", s)
+    return bool(_OUTCOME_ONLY_RE.match(stripped))
+
+
+def merge_same_day_filings(rows, join: str = " · ", max_chars: int = 300):
+    """Collapse multiple filings by one issuer into a single row.
+
+    Talwalkars' three filings on one day become one row whose summary is the
+    three summaries joined by ``join``, truncated to ``max_chars`` with a
+    ``(+n more filings)`` suffix naming what was elided.
+
+    Identity is the resolved ticker when present, else the normalised company
+    name — so a null-symbol issuer still groups with itself. Row order and the
+    first row's other fields are preserved; ``filing_count``, ``summaries`` and
+    ``attachment_urls`` are added.
+    """
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    for r in rows:
+        ident = clean_cell(r.get("symbol")).upper() or _normalize_company(r.get("company_name"))
+        if not ident:
+            ident = clean_cell(r.get("seq_id")) or f"__row{len(order)}"
+        if ident not in groups:
+            merged = dict(r)
+            merged["filing_count"] = 0
+            merged["summaries"] = []
+            merged["attachment_urls"] = []
+            groups[ident] = merged
+            order.append(ident)
+        g = groups[ident]
+        g["filing_count"] += 1
+        s = clean_cell(r.get("summary"))
+        if s and s not in g["summaries"]:
+            g["summaries"].append(s)
+        u = clean_cell(r.get("attachment_url"))
+        if u and u not in g["attachment_urls"]:
+            g["attachment_urls"].append(u)
+
+    out = []
+    for ident in order:
+        g = groups[ident]
+        parts = g["summaries"]
+        joined = join.join(parts)
+        if len(joined) > max_chars:
+            kept, used = [], 0
+            for p in parts:
+                add = len(p) + (len(join) if kept else 0)
+                if used + add > max_chars:
+                    break
+                kept.append(p)
+                used += add
+            if not kept:  # a single summary already over the cap
+                kept = [truncate(parts[0], max_chars)]
+            n_more = len(parts) - len(kept)
+            joined = join.join(kept)
+            if n_more > 0:
+                joined += f" (+{n_more} more filing{'s' if n_more != 1 else ''})"
+        g["summary"] = joined
+        out.append(g)
+    return out
+
+
+# Section v renders individual rows only for coverage names and *substantive*
+# press releases. "Substantive" is deal/operations news; awards, CSR and routine
+# corporate-citizenship PR collapse into the count line.
+#
+# Two guards keep this honest, both learned from the 07 Aug corpus:
+#
+#  - Only narrative categories are eligible. Without this, the keyword test runs
+#    against every filing and "Trading Window" / "Spurt in Volume" / "Certificate
+#    under SEBI (Depositories and Participants) Regulations" match on their own
+#    compliance boilerplate.
+#  - Word boundaries, not substrings. Bare "order" also matches "in order to",
+#    "recorded" and "border"; bare "sebi" matches every regulation citation.
+_PR_ELIGIBLE_CATEGORIES = (
+    "press release", "newspaper publication", "general update", "updates",
+)
+_PR_VETO_CATEGORIES = (
+    "trading window", "spurt in volume", "price movement", "certificate under",
+    "structural digital database", "news verification", "monitoring agency",
+    "compliance", "statement of deviation", "security cover",
+)
+
+# "in order to" / "in order that" are ordinary English, not order wins. Word
+# boundaries do not help — "order" really is a standalone word there — so the
+# phrase is stripped before the substantive test runs.
+_ORDER_IDIOM_RE = re.compile(r"\bin\s+order\s+(?:to|that|for)\b", re.IGNORECASE)
+
+_PR_SUBSTANTIVE_RE = re.compile(
+    r"\b(?:"
+    r"acquisitions?|acquires?|acquired|merger|amalgamation|demerger|"
+    r"stake\s+(?:sale|purchase|acquisition)|divest\w*|"
+    r"orders?|contracts?|loi|letter\s+of\s+intent|work\s+order|purchase\s+order|"
+    r"capacity|capex|expansion|expands?|commission\w*|greenfield|brownfield|"
+    r"new\s+plant|manufacturing\s+facility|"
+    r"regulatory\s+approval|environmental\s+clearance|"
+    r"fund\s+rais\w*|qip|preferential\s+(?:issue|allotment)|rights\s+issue"
+    r")\b",
+    re.IGNORECASE,
+)
+_PR_ROUTINE_RE = re.compile(
+    r"\b(?:"
+    r"awards?|awarded|recognition|recognised|recognized|csr|corporate\s+social|"
+    r"felicitat\w*|honour\w*|honor\w*|great\s+place\s+to\s+work|"
+    r"certification|anniversary|celebrat\w*|sponsors?\w*"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def is_press_release_like(category) -> bool:
+    """True for the narrative categories eligible for the substantive test."""
+    c = clean_cell(category).casefold()
+    if not c:
+        return False
+    if any(v in c for v in _PR_VETO_CATEGORIES):
+        return False
+    return any(e in c for e in _PR_ELIGIBLE_CATEGORIES)
+
+
+def is_substantive_press_release(category, summary) -> bool:
+    """True for deal/operations PR; False for awards, CSR and routine notices.
+
+    Substantive markers win outright: "bags order, wins award" is an order win
+    that happens to mention an award, so it stays. A row with only routine
+    markers — or with neither — collapses into the count line.
+    """
+    if not is_press_release_like(category):
+        return False
+    text = _ORDER_IDIOM_RE.sub(" ", f"{clean_cell(category)} {clean_cell(summary)}")
+    if not text.strip():
+        return False
+    return bool(_PR_SUBSTANTIVE_RE.search(text))
+
+
+def is_routine_pr(category, summary) -> bool:
+    """True when a filing looks like awards/CSR/anniversary PR and nothing more."""
+    text = _ORDER_IDIOM_RE.sub(" ", f"{clean_cell(category)} {clean_cell(summary)}")
+    return (bool(_PR_ROUTINE_RE.search(text))
+            and not bool(_PR_SUBSTANTIVE_RE.search(text)))
+
+
+# Buckets for section v's categorical count line.
+_OTHER_BUCKETS = (
+    ("AGM notices",            ("shareholders meeting", "agm", "egm", "postal ballot")),
+    ("scrutinizer reports",    ("scrutinizer", "scrutiniser", "voting results")),
+    ("KMP changes",            ("appointment", "cessation", "resignation", "change in director",
+                                "change in management", "change in auditors", "demise")),
+    ("investor presentations", ("investor presentation", "analyst", "investor meet", "con. call")),
+    ("press releases",         ("press release", "newspaper publication")),
+)
+
+
+def other_announcement_bucket(category, summary="") -> str:
+    """Label a section-v filing for the categorical count line.
+
+    Category is tried first so a press release *about* an appointment counts as
+    a press release; the summary is only consulted when the category is silent.
+    """
+    text = f"{clean_cell(category)} {clean_cell(summary)}".casefold()
+    cat = clean_cell(category).casefold()
+    for label, needles in _OTHER_BUCKETS:
+        if any(n in cat for n in needles):
+            return label
+    for label, needles in _OTHER_BUCKETS:
+        if any(n in text for n in needles):
+            return label
+    return "other filings"
+
+
+def count_line(buckets, tail: str = "") -> str:
+    """Render '12 AGM notices · 4 KMP changes' from a {label: count} mapping.
+
+    Zero-count buckets are omitted; an empty mapping yields "".
+    """
+    parts = [f"{n} {label}" for label, n in buckets.items() if n]
+    if not parts:
+        return ""
+    line = " · ".join(parts)
+    return f"{line}{tail}" if tail else line
