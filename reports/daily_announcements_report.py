@@ -40,19 +40,24 @@ try:  # works whether imported as a package or run as a script from repo root
         announcement_key, announcement_tag, classify_corp_action, clean_cell,
         dedup_keep_order, find_near_duplicate_issuers, group_debt_rows,
         is_debt_instrument, is_material_capital_raise, materiality_kind,
-        normalize_currency, normalize_headline, resolve_symbol, route_section,
-        score_tape_item, subtitle_corp_actions, subtitle_of_which, touchpoint_key,
-        truncate,
+        normalize_currency, normalize_headline, normalize_purpose, resolve_symbol,
+        route_section, score_tape_item, subtitle_corp_actions, subtitle_of_which,
+        touchpoint_key, truncate,
     )
 except ImportError:  # pragma: no cover
     from transforms import (
         announcement_key, announcement_tag, classify_corp_action, clean_cell,
         dedup_keep_order, find_near_duplicate_issuers, group_debt_rows,
         is_debt_instrument, is_material_capital_raise, materiality_kind,
-        normalize_currency, normalize_headline, resolve_symbol, route_section,
-        score_tape_item, subtitle_corp_actions, subtitle_of_which, touchpoint_key,
-        truncate,
+        normalize_currency, normalize_headline, normalize_purpose, resolve_symbol,
+        route_section, score_tape_item, subtitle_corp_actions, subtitle_of_which,
+        touchpoint_key, truncate,
     )
+
+try:  # works whether imported as a package or run as a script from repo root
+    from reports.assembly import Assembly, build_assembly
+except ImportError:  # pragma: no cover
+    from assembly import Assembly, build_assembly
 
 logger = logging.getLogger("nse.announcements.report")
 
@@ -887,13 +892,21 @@ def _bac_coverage_panel(
     bm_filings: pd.DataFrame,
     ec: pd.DataFrame,
     ca: pd.DataFrame,
+    assembly: "Assembly | None" = None,
 ) -> str:
     # Issue 5: only cite "Announcements" for a symbol that actually appears in a
-    # *displayed* body section (iv Key / v Other) — i.e. routes to 'key'/'other'.
-    # Citing a symbol that is filtered out of the body (debt-only, or a category
-    # we never render) is the stale-join bug.
+    # *displayed* body section (iv Key / v Other). Citing a symbol that is
+    # filtered out of the body is the stale-join bug. With the tiered body the
+    # authority for "displayed" is the assembly's rows_body, not a category
+    # predicate — the materiality filters remove far more than routing did.
     displayed_ann_syms: set[str] = set()
-    if not ann.empty:
+    if assembly is not None:
+        for key in ("key_announcements", "other_announcements"):
+            for r in assembly.section(key).rows_body:
+                s = clean_cell(r.get("symbol"))
+                if s:
+                    displayed_ann_syms.add(s)
+    elif not ann.empty:
         for _, r in ann.iterrows():
             if route_section(r, _HIGH_PRIORITY, _MEDIUM_PRIORITY) in ("key", "other"):
                 s = clean_cell(r.get("symbol"))
@@ -1010,41 +1023,20 @@ def _bac_coverage_panel(
         f'across board meetings, event calendar &amp; corporate actions.</div>'
     )
 
-    # Build nifty table
-    if nifty_rows:
-        table_rows_html = ""
-        for r in nifty_rows[:20]:
-            badge = _nifty_badge(r["symbol"])
-            table_rows_html += (
-                f'<tr>'
-                f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
-                f'font-family:\'Times New Roman\',Times,serif; font-size:12px; '
-                f'font-weight:600; white-space:nowrap;">'
-                f'{_e(r["symbol"])}{badge}</td>'
-                f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
-                f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                f'color:{_STONE};">{_e(r["section"])}</td>'
-                f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
-                f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                f'color:{_INK_SOFT};">{r["event"]}</td>'
-                f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
-                f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-                f'color:{_BURGUNDY}; white-space:nowrap;">{_e(_fmt_date(r["date"]))}</td>'
-                f'</tr>'
-            )
-        nifty_table = (
-            f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">'
-            f'<thead><tr>'
-            f'{_th("Symbol")}{_th("Section")}{_th("Event")}{_th("Date")}'
-            f'</tr></thead>'
-            f'<tbody>{table_rows_html}</tbody>'
-            f'</table>'
-        )
-    else:
-        nifty_table = (
-            f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:12px; '
-            f'color:{_STONE}; font-style:italic;">No NIFTY50/100 touchpoints in scope.</div>'
-        )
+    # Change 1: the touchpoint TABLE is gone. It duplicated "Next 3 Sessions"
+    # almost row for row (18 Aug: ICICIBANK/FEDERALBNK Fund Raising 21 Aug
+    # appeared in both). This panel is now prose only — the two lines above —
+    # and "Next 3 Sessions" is the single canonical forward table. The deduped
+    # `nifty_rows` list is still computed because the Pillar I counts in
+    # `pillar_para` are derived from it.
+    pointer = (
+        f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+        f'color:{_STONE}; font-style:italic; line-height:1.55;">'
+        f'Forward detail in <span style="font-style:normal;">Next 3 Sessions</span> below.</div>'
+    ) if nifty_rows else (
+        f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:12px; '
+        f'color:{_STONE}; font-style:italic;">No NIFTY50/100 touchpoints in scope.</div>'
+    )
 
     return f"""
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -1063,7 +1055,7 @@ def _bac_coverage_panel(
         <div style="border-top:1px solid {_TAN}; margin-bottom:14px;"></div>
         {active_para}
         {pillar_para}
-        {nifty_table}
+        {pointer}
       </td></tr>
     </table>
   </td></tr>
@@ -1091,7 +1083,7 @@ def _collect_session_events(
     day_set = {d.isoformat() for d in next_days}
     events: list[dict] = []
 
-    def _add(sym, seg, typ, text, day_iso, size=0.0):
+    def _add(sym, seg, typ, text, day_iso, section_label, size=0.0):
         sym = clean_cell(sym)
         if not sym:
             return
@@ -1099,29 +1091,44 @@ def _collect_session_events(
             "symbol": sym, "segment": clean_cell(seg).lower(), "type": typ,
             "purpose": normalize_currency(text), "date": day_iso,  # issue 17: ₹
             "universe": _universe_of(sym), "kind": materiality_kind(text, size),
-            "size": size, "section": "board" if typ == "Board Mtg" else "corp_action",
+            "size": size, "section": section_label,
+            "event_type": normalize_purpose(text),
         })
 
-    if bm_filings is not None and not bm_filings.empty:
-        for _, r in bm_filings.iterrows():
-            d = clean_cell(r.get("meeting_date"))
-            if d in day_set:
-                _add(r.get("symbol"), r.get("segment"), "Board Mtg", r.get("purpose"), d)
-    if ec is not None and not ec.empty:
-        for _, r in ec.iterrows():
-            d = clean_cell(r.get("meeting_date"))
-            if d in day_set:
-                _add(r.get("symbol"), r.get("segment"), "Event", r.get("purpose"), d)
-    if ca is not None and not ca.empty:
-        for _, r in ca.iterrows():
-            d = clean_cell(r.get("ex_date"))
-            if d in day_set:
-                subj = clean_cell(r.get("subject"))
-                _add(r.get("symbol"), r.get("segment"), "Corp Action", subj, d,
-                     size=_parse_dividend_amount(subj))
+    for r in _rows(bm_filings):
+        d = clean_cell(r.get("meeting_date"))
+        if d in day_set:
+            _add(r.get("symbol"), r.get("segment"), "Board Mtg", r.get("purpose"), d,
+                 "Board Meetings")
+    for r in _rows(ec):
+        d = clean_cell(r.get("meeting_date"))
+        if d in day_set:
+            _add(r.get("symbol"), r.get("segment"), "Event", r.get("purpose"), d,
+                 "Event Calendar")
+    for r in _rows(ca):
+        d = clean_cell(r.get("ex_date"))
+        if d in day_set:
+            subj = clean_cell(r.get("subject"))
+            _add(r.get("symbol"), r.get("segment"), "Corp Action", subj, d,
+                 "Corp Actions", size=_parse_dividend_amount(subj))
 
-    return dedup_keep_order(
-        events, key=lambda e: touchpoint_key(e["symbol"], e["date"], e["purpose"]))
+    # Change 1: dedupe on (symbol, event_type, date). The same fund raise filed
+    # under both board_meetings and event_calendar collapses to one row.
+    events = dedup_keep_order(
+        events, key=lambda e: (clean_cell(e["symbol"]).upper(), e["event_type"], e["date"]))
+
+    # …but when the two sources disagree on the DATE for one (symbol, event_type),
+    # both rows survive and each is labelled with the section it came from, so the
+    # discrepancy is visible rather than silently resolved in favour of whichever
+    # source happened to be appended first.
+    by_pair: dict[tuple, list[dict]] = {}
+    for e in events:
+        by_pair.setdefault((clean_cell(e["symbol"]).upper(), e["event_type"]), []).append(e)
+    for group in by_pair.values():
+        disagrees = len({e["date"] for e in group}) > 1
+        for e in group:
+            e["section_note"] = e["section"] if disagrees else ""
+    return events
 
 
 def _next_sessions_html(
@@ -1149,6 +1156,15 @@ def _next_sessions_html(
         day_label = f"{d.strftime('%A')}, {d.day} {d.strftime('%b')}" if d else ""
         badge = _nifty_badge(e["symbol"])
         seg_badge = _seg_badge(e["segment"])
+        # ✦ marks a BAC coverage name (the panel's own legend explains it).
+        star = (
+            f'<span style="color:{_BURGUNDY}; font-size:13px; margin-right:4px;">&#10022;</span>'
+        ) if e["symbol"] in _BAC_ACTIVE else ""
+        # Only populated when two sources disagree on the date for this event.
+        note = (
+            f'<span style="color:{_STONE}; font-style:italic; font-size:10.5px; '
+            f'margin-left:0.5em;">({_e(e["section_note"])})</span>'
+        ) if e.get("section_note") else ""
         return (
             f'<tr>'
             f'<td style="padding:5px 10px 5px 0; border-bottom:1px solid {_SAND}; '
@@ -1159,10 +1175,10 @@ def _next_sessions_html(
             f'color:{_BURGUNDY}; font-weight:600; white-space:nowrap;">{_e(e["type"])}</td>'
             f'<td style="padding:5px 10px; border-bottom:1px solid {_SAND}; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:12px; font-weight:600;">'
-            f'{_e(e["symbol"])}{seg_badge}{badge}</td>'
+            f'{star}{_e(e["symbol"])}{seg_badge}{badge}</td>'
             f'<td style="padding:5px 0 5px 10px; border-bottom:1px solid {_SAND}; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
-            f'color:{_INK_SOFT};">{_e(e["purpose"])}</td>'
+            f'color:{_INK_SOFT};">{_e(e["purpose"])}{note}</td>'
             f'</tr>'
         )
 
@@ -1403,10 +1419,40 @@ def _underlying_filings_separator() -> str:
 
 
 # ─── HTML renderers ───────────────────────────────────────────────────────────
+#
+# Every section renderer takes a list of assembled row dicts plus an optional
+# row cap. The email passes the curated ``rows_body`` with a cap; the PDF passes
+# the complete ``rows_all`` with ``cap=None``. Selection logic lives in
+# reports/assembly.py — these functions only draw.
 
-def _bm_table_enhanced(df: pd.DataFrame) -> str:
-    """Enhanced board meeting filings table with star prefix and nifty badges."""
-    if df.empty:
+
+def _rows(source) -> list[dict]:
+    """Accept a row list or a DataFrame (transitional) and return a row list."""
+    if source is None:
+        return []
+    if isinstance(source, pd.DataFrame):
+        return [] if source.empty else source.to_dict("records")
+    return list(source)
+
+
+def _rollup_line(text: str) -> str:
+    """The one-line count that stands in for rows collapsed out of the body."""
+    if not text:
+        return ""
+    return (
+        f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
+        f'color:{_STONE}; font-style:italic; padding:10px 2px 0 2px; line-height:1.55;">'
+        f'{_e(text)}</div>'
+    )
+
+def _bm_table_enhanced(records: list[dict], cap: int | None = None) -> str:
+    """Enhanced board meeting filings table with star prefix and nifty badges.
+
+    Takes assembled rows rather than a DataFrame so the email (filtered, capped)
+    and the PDF (complete, uncapped) render through the same code path.
+    """
+    records = _rows(records)
+    if not records:
         return (
             f'<p style="color:{_STONE}; font-style:italic; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
@@ -1415,7 +1461,7 @@ def _bm_table_enhanced(df: pd.DataFrame) -> str:
 
     rows: list[str] = []
     prev_date = None
-    for _, row in df.iterrows():
+    for row in (records[:cap] if cap else records):
         d         = str(row.get("meeting_date") or "")
         purpose   = str(row.get("purpose") or "")
         symbol    = str(row.get("symbol") or "")
@@ -1468,9 +1514,10 @@ def _bm_table_enhanced(df: pd.DataFrame) -> str:
     )
 
 
-def _ec_table_enhanced(df: pd.DataFrame) -> str:
+def _ec_table_enhanced(records: list[dict], cap: int | None = None) -> str:
     """Enhanced event calendar table with Symbol+Company+Agenda merged cell."""
-    if df.empty:
+    records = _rows(records)
+    if not records:
         return (
             f'<p style="color:{_STONE}; font-style:italic; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
@@ -1479,7 +1526,7 @@ def _ec_table_enhanced(df: pd.DataFrame) -> str:
 
     rows: list[str] = []
     prev_date = None
-    for _, row in df.iterrows():
+    for row in (records[:cap] if cap else records):
         d       = str(row.get("meeting_date") or "")
         purpose = str(row.get("purpose") or "")
         symbol  = str(row.get("symbol") or "")
@@ -1538,8 +1585,9 @@ def _ec_table_enhanced(df: pd.DataFrame) -> str:
     )
 
 
-def _corporate_actions_html(df: pd.DataFrame) -> str:
-    if df.empty:
+def _corporate_actions_html(records: list[dict], cap: int | None = None) -> str:
+    records = _rows(records)
+    if not records:
         return (
             f'<p style="color:{_STONE}; font-style:italic; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
@@ -1547,7 +1595,7 @@ def _corporate_actions_html(df: pd.DataFrame) -> str:
         )
 
     rows: list[str] = []
-    for _, row in df.iterrows():
+    for row in (records[:cap] if cap else records):
         # Issue 17: standardise rupee notation on ₹ ("Rs 25 Per Share" → "₹25 …").
         subject = normalize_currency(row.get("subject"))
         symbol  = clean_cell(row.get("symbol"))
@@ -1612,18 +1660,22 @@ def _corporate_actions_html(df: pd.DataFrame) -> str:
     )
 
 
-def _debt_market_html(df: pd.DataFrame) -> str:
+def _debt_market_html(records: list[dict], cap: int | None = None) -> str:
     """Debt Market section — grouped by (issuer, payment nature) so 11 sequential
     NPCIL record-date updates collapse to one row with an ISIN count and date
     range (issue 13), rather than dominating the section."""
-    if df is None or df.empty:
+    records = _rows(records)
+    if not records:
         return (
             f'<p style="color:{_STONE}; font-style:italic; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
             f'No debt-market filings today.</p>'
         )
 
-    groups = group_debt_rows(df.to_dict("records"))
+    n_source = len(records)
+    groups = group_debt_rows(records)
+    if cap:
+        groups = groups[:cap]
     rows: list[str] = []
     for g in groups:
         issuer = truncate(g["issuer"], 38) or "—"
@@ -1658,7 +1710,7 @@ def _debt_market_html(df: pd.DataFrame) -> str:
     note = (
         f'<div style="font-family:\'Times New Roman\',Times,serif; font-size:11.5px; '
         f'color:{_STONE}; font-style:italic; padding:8px 2px 0 2px;">'
-        f'{len(df)} debt filings collapsed into {len(groups)} issuer/payment groups.</div>'
+        f'{n_source} debt filings collapsed into {len(groups)} issuer/payment groups.</div>'
     )
     return (
         f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" '
@@ -1671,13 +1723,14 @@ def _debt_market_html(df: pd.DataFrame) -> str:
 _SAST_CATEGORY = "Disclosure under SEBI Takeover Regulations"
 
 
-def _sast_micro_section(df: pd.DataFrame) -> str:
+def _sast_micro_section(source) -> str:
     """Issue 23: SAST Reg 31(4) disclosures dominate section iv by volume. Show
     only rows touching the BAC/NIFTY universe; roll the rest into a single count."""
-    if df is None or df.empty:
+    records = _rows(source)
+    if not records:
         return ""
     records = dedup_keep_order(
-        df.to_dict("records"),
+        records,
         key=lambda r: announcement_key(r.get("symbol"), r.get("company_name"), r.get("summary")),
     )
     in_universe, rest = [], 0
@@ -1728,37 +1781,27 @@ def _sast_micro_section(df: pd.DataFrame) -> str:
 
 
 def _announcements_html(
-    df: pd.DataFrame,
-    categories: set[str],
+    records: list[dict],
     name_map: dict | None = None,
-    exclude_tags: set[str] | None = None,
+    cap: int | None = 60,
 ) -> str:
-    if df.empty:
-        return (
-            f'<p style="color:{_STONE}; font-style:italic; '
-            f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
-            f'None today.</p>'
-        )
-    sub = df[df["category"].isin(categories)].copy() if categories else df.copy()
-    # Issue 14: route by tag — section v drops analyst_meet (those go to Top Movers).
-    if exclude_tags:
-        sub = sub[~sub["category"].map(lambda c: announcement_tag(c) in exclude_tags)]
-    if sub.empty:
-        return (
-            f'<p style="color:{_STONE}; font-style:italic; '
-            f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
-            f'None today.</p>'
-        )
+    """Render assembled announcement rows.
 
-    # Issue 6: drop duplicate rows keyed on (identity, sha1(summary)).
-    records = dedup_keep_order(
-        sub.to_dict("records"),
-        key=lambda r: announcement_key(r.get("symbol"), r.get("company_name"), r.get("summary")),
-    )
+    Category selection, dedup and multi-filing merging now happen in
+    ``reports.assembly``; this function only renders. ``cap=None`` renders
+    everything, which is what the PDF attachment uses.
+    """
+    records = _rows(records)
+    if not records:
+        return (
+            f'<p style="color:{_STONE}; font-style:italic; '
+            f'font-family:\'Times New Roman\',Times,serif; font-size:13px; padding:0 36px;">'
+            f'None today.</p>'
+        )
     n_records = len(records)
 
     rows: list[str] = []
-    for row in records[:60]:
+    for row in (records[:cap] if cap else records):
         company = clean_cell(row.get("company_name"))
         seg     = clean_cell(row.get("segment"))
         # Issue 7: never emit "nan*" — resolve a real ticker or fall back to the
@@ -1787,22 +1830,33 @@ def _announcements_html(
         link_open  = f'<a href="{_e(url)}" style="color:{_BURGUNDY}; text-decoration:none;" target="_blank">' if url else ""
         link_close = "</a>" if url else ""
 
+        # Rows merged from several same-day filings carry a count chip so the
+        # reader knows the summary is a join, not a single filing.
+        n_filings = int(row.get("filing_count") or 1)
+        nifty_b = _nifty_badge(clean_cell(row.get("symbol")))
+        filings_chip = (
+            f'<span class="universe-badge" style="font-size:8.5px; color:{_STONE}; '
+            f'background:{_CREAM}; border:1px solid {_TAN}; padding:1px 4px; '
+            f'margin-left:0.35em; white-space:nowrap;">{n_filings} filings</span>'
+        ) if n_filings > 1 else ""
+
         rows.append(
             f'<tr>'
             f'<td style="padding:8px 10px 8px 12px; border-bottom:1px solid {_SAND}; '
             f'font-family:\'Times New Roman\',Times,serif; font-size:13px; '
             f'font-weight:600; vertical-align:top; white-space:nowrap;">'
-            f'{link_open}{_e(name)}{link_close}{seg_badge}</td>'
+            f'{link_open}{_e(name)}{link_close}{seg_badge}{nifty_b}{filings_chip}</td>'
             f'<td style="padding:8px 12px 8px 10px; border-bottom:1px solid {_SAND}; '
             f'{summary_style}">{material_tag}{_e(summary[:300])}</td>'
             f'</tr>'
         )
 
     extra = ""
-    if n_records > 60:
+    if cap and n_records > cap:
         extra = (
             f'<tr><td colspan="2" style="padding:8px 12px; font-family:\'Times New Roman\',Times,serif; '
-            f'font-size:12px; color:{_STONE}; font-style:italic;">…and {n_records - 60} more</td></tr>'
+            f'font-size:12px; color:{_STONE}; font-style:italic;">…and {n_records - cap} more '
+            f'&#8212; see attachment</td></tr>'
         )
 
     thead = f'<tr>{_th("Symbol / Company")}{_th("Summary")}</tr>'
@@ -1856,6 +1910,8 @@ def _build_html(
     generated_at: datetime,
     today: date | None = None,
     prices: dict[str, dict] | None = None,
+    assembly: "Assembly | None" = None,
+    attachment_note: str = "",
 ) -> str:
     if today is None:
         today = report_date
@@ -1913,16 +1969,9 @@ def _build_html(
     # Build name map for debt symbol detection
     name_map = _build_name_map(ann)
 
-    # Issue 8: split the announcement universe by instrument type up front so
-    # debt-only filings (e.g. NBFID board outcomes) can never bleed into the
-    # equity Key/Other sections — they live in vi. Debt regardless of category.
-    if not ann.empty and "segment" in ann.columns:
-        debt_mask = ann["segment"].astype(str).str.lower() == "debt"
-        ann_equity = ann[~debt_mask]
-        ann_debt   = ann[debt_mask]
-    else:
-        ann_equity = ann
-        ann_debt   = ann.iloc[0:0] if not ann.empty else ann
+    # Issue 8 (the equity/debt split that kept debt filings out of iv/v) now
+    # happens once inside build_assembly, which routes debt to section vi
+    # regardless of category.
 
     # Issue 9: flag likely issuer-name parse errors (e.g. "IIFL Finance Limited"
     # vs "IFL Finance Limited") for manual review. No CIN/LEI master available.
@@ -1930,26 +1979,46 @@ def _build_html(
         for a, b, dist in find_near_duplicate_issuers(ann["company_name"].tolist(), threshold=2):
             logger.warning("Possible issuer-name mismatch (edit distance %d): %r vs %r", dist, a, b)
 
-    # Section HTML
-    bm_html      = _bm_table_enhanced(bm_filings)
-    ec_html      = _ec_table_enhanced(ec)
-    ca_html      = _corporate_actions_html(ca)
+    # ── Assembly ─────────────────────────────────────────────────────────────
+    # Every section now comes from one place in two forms: rows_body (curated,
+    # rendered below) and rows_all (complete, rendered into the attachments).
+    if assembly is None:
+        assembly = build_assembly(report_date, ann, bm_filings, ec, ca, today=today)
+    cfg = assembly.config
+
+    sec_bm    = assembly.section("board_meetings")
+    sec_ec    = assembly.section("event_calendar")
+    sec_ca    = assembly.section("corporate_actions")
+    sec_key   = assembly.section("key_announcements")
+    sec_other = assembly.section("other_announcements")
+    sec_debt  = assembly.section("debt_market")
+
+    # Section HTML — body form: filtered rows plus a rollup line naming what the
+    # filter removed, so nothing disappears without being counted.
+    bm_html = _bm_table_enhanced(sec_bm.rows_body) + _rollup_line(sec_bm.rollup)
+    ec_html = _ec_table_enhanced(sec_ec.rows_body) + _rollup_line(sec_ec.rollup)
+    ca_html = _corporate_actions_html(sec_ca.rows_body) + _rollup_line(sec_ca.rollup)
+
     # Issue 23: SAST disclosures get their own micro-section; keep the main Key
     # Announcements table focused on results/outcomes/record dates.
-    key_ann_html = _announcements_html(ann_equity, _HIGH_PRIORITY - {_SAST_CATEGORY})
-    sast_df = (
-        ann_equity[ann_equity["category"] == _SAST_CATEGORY]
-        if not ann_equity.empty and "category" in ann_equity.columns else ann_equity.iloc[0:0]
-    )
-    key_ann_html += _sast_micro_section(sast_df)
-    # Issue 14: section v excludes analyst meets (surfaced in Top Movers instead).
-    other_html   = _announcements_html(ann_equity, _MEDIUM_PRIORITY, exclude_tags={"analyst_meet"})
-    debt_html    = _debt_market_html(ann_debt)
+    key_body = [r for r in sec_key.rows_body
+                if clean_cell(r.get("category")) != _SAST_CATEGORY]
+    sast_rows = [r for r in sec_key.rows_all
+                 if clean_cell(r.get("category")) == _SAST_CATEGORY]
+    # cap=None: the assembly already applied the configured body cap, so it is
+    # the single place row counts are bounded.
+    key_ann_html = _announcements_html(key_body, cap=None)
+    key_ann_html += _sast_micro_section(sast_rows)
+    key_ann_html += _rollup_line(sec_key.rollup)
+
+    other_html = (_announcements_html(sec_other.rows_body, cap=None)
+                  + _rollup_line(sec_other.rollup))
+    debt_html = _debt_market_html(sec_debt.rows_body) + _rollup_line(sec_debt.rollup)
 
     # New panels
     editorial_html   = _build_editorial(report_date, ann, bm_filings, ec, ca)
-    bac_panel_html   = _bac_coverage_panel(ann, bm_filings, ec, ca)
-    next_days        = _next_trading_days(today, 3)
+    bac_panel_html   = _bac_coverage_panel(ann, bm_filings, ec, ca, assembly=assembly)
+    next_days        = _next_trading_days(today, cfg.next_sessions.count)
     session_html     = _next_sessions_html(bm_filings, ec, ca, next_days)
     movers_html      = _top_movers_panel(ann, prices=prices)
     separator_html   = _underlying_filings_separator()
@@ -2082,8 +2151,9 @@ def _build_html(
   </table>
 
   <!-- ii. EVENT CALENDAR -->
-  {_section_hdr("ii", "Event Calendar", "full forward schedule",
-    "NSE&#8217;s published event calendar — results dates, fund raises, and key board agendas scheduled weeks ahead.",
+  {_section_hdr("ii", "Event Calendar",
+    f"next {cfg.event_calendar.horizon_sessions} sessions &#183; coverage &amp; index names",
+    "NSE&#8217;s published event calendar — results dates, fund raises, and key board agendas, with company and full agenda text. Complete forward schedule in the attachment.",
     net_note=ec_net)}
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
     <tr><td style="padding:18px 36px 6px 36px;">{ec_html}{_star_legend()}</td></tr>
@@ -2133,6 +2203,7 @@ def _build_html(
             Set in <span style="font-style:italic;">Times New Roman</span>.
             Compiled by the NSE Announcements pipeline at {gen_time}{gen_day} of {gen_month}.
           </p>
+          {attachment_note}
         </td>
         <td valign="top" width="45%">
           <div style="font-family:'Times New Roman',Times,serif; font-size:9.5px;
@@ -2159,13 +2230,21 @@ def _build_html(
 
 # ─── Email ────────────────────────────────────────────────────────────────────
 
-def _send_email(*, sender, password, sender_name, recipients, subject, html):
+def _send_email(*, sender, password, sender_name, recipients, subject, html,
+                attachments: list[tuple[str, bytes, str]] | None = None):
+    """Send the report. ``attachments`` is a list of (filename, bytes, mimetype)."""
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"]    = f"{sender_name} <{sender}>"
     msg["To"]      = ", ".join(recipients)
     msg.set_content("This report requires an HTML-capable email client.")
     msg.add_alternative(html, subtype="html")
+
+    for filename, payload, mimetype in (attachments or []):
+        maintype, _, subtype = mimetype.partition("/")
+        msg.add_attachment(payload, maintype=maintype or "application",
+                           subtype=subtype or "octet-stream", filename=filename)
+
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
         smtp.login(sender, password)
         smtp.send_message(msg)
@@ -2423,12 +2502,29 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
         prices = _fetch_prices(movers_syms, today) if movers_syms else {}
         logger.info("Fetched prices for %d/%d movers symbols", len(prices), len(movers_syms))
 
-        html = _build_html(report_date, ann, bm_filings, ec, ca, generated_at, today=today, prices=prices)
+        # One assembly feeds both the curated body and the complete attachments.
+        assembly = build_assembly(report_date, ann, bm_filings, ec, ca, today=today)
+
+        from reports.attachments import ATTACHMENT_NOTICE, build_attachments
+        attachments = build_attachments(assembly, generated_at=generated_at)
+        note_html = (
+            f'<p style="font-family:\'Times New Roman\',Times,serif; font-size:12.5px; '
+            f'color:{_INK}; line-height:1.65; margin:8px 0 0 0;">{ATTACHMENT_NOTICE}</p>'
+        ) if attachments else ""
+
+        html = _build_html(report_date, ann, bm_filings, ec, ca, generated_at,
+                           today=today, prices=prices, assembly=assembly,
+                           attachment_note=note_html)
 
         if preview_mode:
             with open(preview_path, "w", encoding="utf-8") as fh:
                 fh.write(html)
             logger.info("Preview saved to %s", preview_path)
+            for filename, payload, _mime in attachments:
+                side = os.path.join(os.path.dirname(os.path.abspath(preview_path)), filename)
+                with open(side, "wb") as fh:
+                    fh.write(payload)
+                logger.info("Preview attachment saved to %s (%d bytes)", side, len(payload))
             return 0
 
         pretty_date = report_date.strftime("%d %b %Y")
@@ -2437,7 +2533,9 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
             recipients=recipients,
             subject=f"BAC Announcements — NSE — {pretty_date}",
             html=html,
+            attachments=attachments,
         )
+        logger.info("Attached: %s", [n for n, _, _ in attachments] or "none")
         _mark_sent(report_date)
         logger.info("Sent to %s", recipients)
 

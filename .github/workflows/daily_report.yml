@@ -38,6 +38,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # The PDF attachment is rendered by headless Chromium so that the CI
+      # output matches a local preview exactly (same engine, same HTML).
+      # Cached because the browser download is ~150 MB.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}
+
+      - name: Install Chromium for PDF rendering
+        run: python -m playwright install --with-deps chromium
+
+      # Liberation Serif is metrically identical to Times New Roman, which does
+      # not exist on Linux — without it the PDF reflows against the local preview.
+      - name: Install metric-compatible serif fonts
+        run: sudo apt-get install -y --no-install-recommends fonts-liberation
+
       - name: Scrape announcements, board meetings & corporate actions
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
