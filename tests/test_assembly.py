@@ -25,8 +25,8 @@ from reports import universes as U
 from reports.assembly import SECTION_ORDER, build_assembly, trading_sessions
 from reports.attachments.csv_bundle import CSV_COLUMNS, SECTION_FILENAMES, build_csv_bundle
 from reports.transforms import (
-    category_matches, count_line, is_payload_free_outcome, is_routine_pr,
-    is_substantive_press_release, merge_same_day_filings,
+    category_contains, category_matches, count_line, is_payload_free_outcome,
+    is_routine_pr, is_substantive_press_release, merge_same_day_filings,
     other_announcement_bucket,
 )
 
@@ -171,6 +171,20 @@ def test_other_bucket_labels():
     assert other_announcement_bucket("Investor Presentation") == "investor presentations"
     assert other_announcement_bucket("Copy of Newspaper Publication") == "press releases"
     assert other_announcement_bucket("Spurt in Volume") == "other filings"
+
+
+def test_order_rule_does_not_catch_sebi_enforcement_by_accident():
+    """A bare "order" substring also matched "Action(s) initiated or orders
+    passed" — SEBI enforcement, which then rendered under a section captioned
+    "order wins". Enforcement stays in section iv because it is material, but
+    it must be whitelisted by name, not caught by a loose substring."""
+    from reports.report_config import load_config
+    c = load_config().key_announcements
+    assert "order" not in c.category_contains
+    assert category_contains("Bagging/Receiving of orders/contracts", c.category_contains)
+    for cat in ("Action(s) initiated or orders passed", "Action(s) taken or orders passed"):
+        assert category_matches(cat, c.categories), cat
+        assert not category_contains(cat, c.category_contains), cat
 
 
 def test_count_line_omits_zero_buckets():

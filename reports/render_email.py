@@ -446,7 +446,7 @@ def build_email_html(
         )
     body += d.row(
         section_caption(_ROMAN[4], "Key announcements",
-                        "results, M&amp;A, order wins, allotments, takeover disclosures")
+                        "results, M&amp;A, order wins, allotments, takeover and regulatory disclosures")
         + key_html,
         pad=d.SECTION_PAD,
     )

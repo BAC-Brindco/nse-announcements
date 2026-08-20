@@ -63,6 +63,12 @@ key_announcements:
     - "Preferential issue"
     - "Buyback"
     - "Bagging/Receiving of orders/contracts"
+    # Regulatory action against an issuer is material, so it belongs in iv —
+    # but it must be listed explicitly. It used to arrive here by accident,
+    # caught by the bare "order" substring below, and was then labelled as an
+    # order win.
+    - "Action(s) initiated or orders passed"
+    - "Action(s) taken or orders passed"
   # Substring matches — catches NSE's variants without listing each one.
   category_contains:
     - "financial result"
@@ -70,7 +76,9 @@ key_announcements:
     - "acquisition"
     - "merger"
     - "amalgamation"
-    - "order"          # "Bagging/Receiving of orders/contracts"
+    # "orders/contracts", not bare "order": the loose form also matched
+    # "Action(s) initiated or orders passed" — SEBI enforcement, not an order win.
+    - "orders/contracts"
     - "allotment"
   # Record dates are kept only for body-universe names (they are high-volume
   # and low-signal across the small-cap tail).
