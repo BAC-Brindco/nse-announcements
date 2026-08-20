@@ -24,7 +24,12 @@ Sections:
 
 Env vars:
   SUPABASE_URL, SUPABASE_KEY
-  SMTP_USER, SMTP_PASSWORD, REPORT_RECIPIENTS
+  SMTP_USER, SMTP_PASSWORD
+  REPORT_RECIPIENTS   — one address: bac-reports@brindco.com, the Google Group
+                        that is the single recipient list shared by all three BAC
+                        daily reports (this one, nse-pipeline's deals report and
+                        the morning brief). Readers are added in Google Workspace,
+                        not by editing this secret in three repositories.
   REPORT_SENDER_NAME  (optional, default "BAC Announcements")
   SLACK_WEBHOOK_URL   (optional)
 """
@@ -809,10 +814,48 @@ def _send_slack(webhook_url: str, blocks: list[dict], report_date: date) -> None
 
 # ─── Idempotency ──────────────────────────────────────────────────────────────
 
-def _claim_slot(report_date: date, recipients: list[str]) -> bool:
-    from database.client import get_client
+# A run that dies without reaching _mark_failed leaves the slot 'pending'
+# forever. The job's own timeout is 30 minutes, so a pending slot older than
+# this is certainly dead rather than in flight.
+_STALE_PENDING_MINUTES = 35
+
+
+def _slot_is_stale(created_at) -> bool:
+    ts = clean_cell(created_at)
+    if not ts:
+        return True  # no timestamp to trust — treat as dead rather than block the day
     try:
-        get_client().table("report_log").insert({
+        parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - parsed
+    return age > timedelta(minutes=_STALE_PENDING_MINUTES)
+
+
+def _claim_slot(report_date: date, recipients: list[str]) -> bool:
+    """Claim the day's send slot. True means this run should send.
+
+    The three GHA schedules plus the cron-job.org trigger mean several runs may
+    start for one report_date, so the slot is a unique row and only the winner
+    sends. But a *failed* first attempt used to keep the slot forever: the
+    10:30 and 11:00 fallbacks hit the unique violation, exited 0, and the day
+    produced no email at all — silently, because every run looked green. A
+    known-dead slot is therefore reclaimed:
+
+      sent            → never reclaim; the report went out
+      failed          → reclaim; that is exactly what the fallbacks are for
+      pending, stale  → reclaim; the holder died without marking it
+      pending, fresh  → leave it; another run is genuinely in flight
+    """
+    from database.client import get_client
+    client = get_client()
+    row_filter = (lambda q: q.eq("report_type", REPORT_TYPE)
+                             .eq("report_date", report_date.isoformat()))
+
+    try:
+        client.table("report_log").insert({
             "report_type": REPORT_TYPE,
             "report_date": report_date.isoformat(),
             "status":      "pending",
@@ -820,8 +863,49 @@ def _claim_slot(report_date: date, recipients: list[str]) -> bool:
         }).execute()
         return True
     except Exception as exc:  # noqa: BLE001
-        logger.info("Slot for %s already claimed (%s) — exiting.", report_date, type(exc).__name__)
+        logger.info("Slot for %s exists (%s) — checking whether it is reclaimable.",
+                    report_date, type(exc).__name__)
+
+    try:
+        resp = row_filter(
+            client.table("report_log").select("status,created_at")
+        ).limit(1).execute()
+        rows = resp.data or []
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not read the existing slot for %s (%s) — not sending.",
+                       report_date, exc)
         return False
+
+    if not rows:
+        logger.warning("Slot for %s vanished between insert and read — not sending.",
+                       report_date)
+        return False
+
+    status = clean_cell(rows[0].get("status")).lower()
+    if status == "sent":
+        logger.info("Report for %s already sent — exiting.", report_date)
+        return False
+    if status == "failed":
+        reason = "the previous attempt failed"
+    elif status == "pending" and _slot_is_stale(rows[0].get("created_at")):
+        reason = f"a pending slot older than {_STALE_PENDING_MINUTES}m was left behind"
+    else:
+        logger.info("Slot for %s is pending and fresh — another run holds it.", report_date)
+        return False
+
+    try:
+        row_filter(client.table("report_log").update({
+            "status":        "pending",
+            "recipients":    ",".join(recipients),
+            "error_message": None,
+        })).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not reclaim the slot for %s (%s) — not sending.",
+                       report_date, exc)
+        return False
+
+    logger.warning("Reclaiming the send slot for %s — %s.", report_date, reason)
+    return True
 
 
 def _mark_sent(report_date: date) -> None:

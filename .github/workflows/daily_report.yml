@@ -47,15 +47,27 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}
 
+      # continue-on-error on both: these produce the PDF *attachment*. The report
+      # degrades gracefully without a PDF engine (build_attachments logs and
+      # skips), so a browser download or apt hiccup must cost the attachment,
+      # never the email.
       - name: Install Chromium for PDF rendering
+        continue-on-error: true
         run: python -m playwright install --with-deps chromium
 
       # Liberation Serif is metrically identical to Times New Roman, which does
       # not exist on Linux — without it the PDF reflows against the local preview.
       - name: Install metric-compatible serif fonts
+        continue-on-error: true
         run: sudo apt-get install -y --no-install-recommends fonts-liberation
 
+      # continue-on-error: scrape.yml already collects 5x per trading day, so the
+      # data for this report is in Supabase before this step runs. If NSE 403s
+      # here, main.py exits 1 and would take the whole job — and the email — with
+      # it. A slightly staler report beats no report. (Same reasoning as the
+      # deals pipeline's pre-report scrape step.)
       - name: Scrape announcements, board meetings & corporate actions
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

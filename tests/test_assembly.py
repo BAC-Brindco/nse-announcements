@@ -298,6 +298,39 @@ def test_rollup_lines_present_when_rows_were_dropped(assembly):
             assert sec.rollup, f"{key} dropped {sec.n_dropped} rows with no rollup line"
 
 
+# ═══ Send-slot reclaim ════════════════════════════════════════════════════════
+
+def test_stale_pending_slot_is_reclaimable():
+    """A run that dies without marking the slot must not cost the whole day.
+
+    The job times out at 30 minutes, so a pending slot older than 35 is dead.
+    """
+    from datetime import datetime, timedelta, timezone
+    from reports.daily_announcements_report import _slot_is_stale
+
+    fresh = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+    dead = (datetime.now(timezone.utc) - timedelta(minutes=90)).isoformat()
+    assert not _slot_is_stale(fresh)
+    assert _slot_is_stale(dead)
+
+
+def test_unparseable_slot_timestamp_does_not_block_the_day():
+    from reports.daily_announcements_report import _slot_is_stale
+    # Better to risk a duplicate than to silently send nothing at all.
+    assert _slot_is_stale(None)
+    assert _slot_is_stale("")
+    assert _slot_is_stale("not-a-timestamp")
+
+
+def test_slot_staleness_handles_a_naive_timestamp():
+    from datetime import datetime, timedelta, timezone
+    from reports.daily_announcements_report import _slot_is_stale
+    # Postgres always hands back an offset, but a naive value must not raise.
+    naive = (datetime.now(timezone.utc).replace(tzinfo=None)
+             - timedelta(minutes=90)).isoformat()
+    assert _slot_is_stale(naive)
+
+
 # ═══ Attachments ══════════════════════════════════════════════════════════════
 
 def test_csv_row_counts_equal_unfiltered_assembly_counts(assembly):
