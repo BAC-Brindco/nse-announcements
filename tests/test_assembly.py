@@ -24,10 +24,9 @@ import pandas as pd
 from reports import universes as U
 from reports.assembly import SECTION_ORDER, build_assembly, trading_sessions
 from reports.attachments.csv_bundle import CSV_COLUMNS, SECTION_FILENAMES, build_csv_bundle
-from reports.report_config import load_config
 from reports.transforms import (
-    category_matches, count_line, is_payload_free_outcome, is_press_release_like,
-    is_routine_pr, is_substantive_press_release, merge_same_day_filings,
+    category_matches, count_line, is_payload_free_outcome, is_routine_pr,
+    is_substantive_press_release, merge_same_day_filings,
     other_announcement_bucket,
 )
 

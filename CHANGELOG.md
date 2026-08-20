@@ -1,5 +1,58 @@
 # Changelog
 
+## 2026-08-20 — Adopt the BAC house design system
+
+The announcements email rendered its own parchment/burgundy newspaper style with
+every colour and size as an inline literal, repeated a few hundred times. It now
+renders through `reports/design.py` — the same module the daily deals report
+uses — so the two emails are one document family instead of two designs that
+happened to share a masthead.
+
+### What moved
+- **`reports/design.py`** — vendored from the deals pipeline, byte-identical
+  apart from a provenance note. The two pipelines are separate repositories, so
+  this is a copy rather than a shared import; a change to one must be ported to
+  the other or the house style forks.
+- **`reports/render_email.py`** (new) — all presentation. Section tables take
+  assembled rows plus an optional cap, so the email (`rows_body`) and the PDF
+  (`rows_all`, `cap=None`) render through one code path.
+- **`reports/pdf_render.py`** — the deals pipeline's print-CSS renderer, adapted.
+- `daily_announcements_report.py` drops from **2,581 to ~1,050 lines**: it now
+  fetches, computes editorial/movers/coverage *data*, and dispatches. Every
+  colour literal is gone from it.
+
+### Visual changes
+- Navy/gold on a white 640px card over a grey page, replacing parchment/burgundy.
+- Masthead: gold kicker, navy title, dateline, and a justified scope paragraph
+  stating how many of the day's rows the body shows.
+- KPI grid of four bordered cards; gold "things that matter today" callout with a
+  gold-numbered list; navy callout for the coverage touchpoints prose.
+- House `datatable` throughout — navy uppercase head on a band fill, zebra body,
+  a source line, and the rollup count line as the italic caption *after* the
+  table (house convention: data first, explanation second).
+- ✦ coverage marker now gold; NIFTY50/100 and SME/DEBT render as outlined chips.
+- Δ% in Top Movers is the one genuinely semantic value in the report, so it takes
+  GOOD/BAD; corporate-action types stay structural with a labelled chip.
+- Colophon: navy rule, provenance line, italic disclaimer.
+
+### Outlook hardening inherited from design.py
+Spacing on `<td>` padding rather than divs (Word drops div padding), every
+line-height paired with `mso-line-height-rule:exactly`, `color-scheme: light
+only` so dark mode cannot invert text over an explicit background, an XHTML 1.0
+Transitional doctype, and a hidden preheader for the inbox preview line.
+
+### PDF
+Rebuilt in the same house style: masthead, KPI row, a contents table listing
+rows-per-section and how many reached the email, then all six sections
+unfiltered. Print CSS targets the `bac-page`/`bac-card`/`bac-data` class hooks
+design.py emits, dropping the screen card frame and repeating table headers
+across page breaks. A `'Times New Roman', 'Liberation Serif', 'Tinos', …` stack
+is injected for the PDF only — Times New Roman does not exist on Linux, and this
+keeps `design.py` byte-identical with the deals copy.
+
+Body size is unchanged in substance: 07 Aug renders 25,976 visible characters
+against the 219,807 baseline (**8.5×**).
+
 ## 2026-08-19 — Tiered email body + full-detail attachments
 
 The email body becomes a curated signal layer; the exhaustive data moves to two

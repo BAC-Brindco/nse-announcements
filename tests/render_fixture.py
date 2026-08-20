@@ -87,11 +87,7 @@ def render(name: str = "issue113", out: str | None = None,
         from reports.attachments import ATTACHMENT_NOTICE, build_attachments
         atts = build_attachments(asm, generated_at=_GENERATED_AT)
         if atts:
-            note = (
-                '<p style="font-family:\'Times New Roman\',Times,serif; font-size:12.5px;'
-                ' color:#1a1410; line-height:1.65; margin:8px 0 0 0;">'
-                f'{ATTACHMENT_NOTICE}</p>'
-            )
+            note = ATTACHMENT_NOTICE
 
     html = _build_html(report_date, ann, bm, ec, ca, _GENERATED_AT, today=today,
                        prices=prices, assembly=asm, attachment_note=note)
