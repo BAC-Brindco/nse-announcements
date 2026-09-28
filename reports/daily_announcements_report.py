@@ -1,8 +1,10 @@
 """
 Daily NSE Announcements email report.
 
-Runs once per trading-day morning (Tue–Sat IST) at 10:00 IST. A separate
-intraday scrape captures the day's announcements so the report is complete.
+Runs once per morning at 08:00 IST (Mon–Sat), reporting the previous trading
+day. A separate intraday scrape captures the day's announcements so the report
+is complete. Every run emails the operator a one-line log (reports/ops_log.py):
+sent, failed, or — on Mondays and after holidays — no report today.
 
 The email is a curated focus edition; the complete data ships as a PDF and a
 CSV bundle. Responsibilities are split three ways:
@@ -50,6 +52,7 @@ import pandas as pd
 import pytz
 
 from reports import design, render_email
+from reports.ops_log import OPS_LOG_RECIPIENT, send_ops_log
 from reports import universes as U
 from reports.assembly import Assembly, build_assembly
 from reports.transforms import (
@@ -908,6 +911,47 @@ def _claim_slot(report_date: date, recipients: list[str]) -> bool:
     return True
 
 
+def _log_if_idle(report_date: date, today: date) -> None:
+    """Called when the slot was not ours. If the session was already reported on
+    an earlier day (Monday, or the day after a holiday), tell the operator once
+    per day that nothing goes out today. A slot sent *today* is a duplicate
+    trigger and stays silent."""
+    from database.client import get_client
+    try:
+        rows = (get_client().table("report_log").select("status,sent_at")
+                .eq("report_type", REPORT_TYPE).eq("report_date", report_date.isoformat())
+                .limit(1).execute().data or [])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not read the slot for %s: %s", report_date, exc)
+        return
+    if not rows or clean_cell(rows[0].get("status")).lower() != "sent":
+        return
+    sent_ts = clean_cell(rows[0].get("sent_at"))
+    try:
+        sent_at = datetime.fromisoformat(sent_ts.replace("Z", "+00:00")).astimezone(_IST)
+    except ValueError:
+        return
+    if sent_at.date() >= today:
+        return
+    try:  # one log per idle day, however many triggers fire
+        get_client().table("report_log").insert({
+            "report_type": f"{REPORT_TYPE}_idle",
+            "report_date": today.isoformat(),
+            "status":      "not_sent",
+            "recipients":  OPS_LOG_RECIPIENT,
+        }).execute()
+    except Exception:  # noqa: BLE001
+        return
+    send_ops_log(
+        "Daily Announcements", "NOT SENT",
+        f"No announcements report today. The latest session "
+        f"({report_date:%a %d %b %Y}) was already reported on "
+        f"{sent_at:%a %d %b %H:%M} IST; nothing new to send.",
+        [f"Today (IST): {today:%a %d %b %Y}",
+         "Expected on Mondays and on the day after an exchange holiday."],
+    )
+
+
 def _mark_sent(report_date: date) -> None:
     from database.client import get_client
     get_client().table("report_log").update({
@@ -1026,6 +1070,7 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
         recipients    = [r.strip() for r in _env("REPORT_RECIPIENTS").split(",") if r.strip()]
         sender_name   = os.environ.get("REPORT_SENDER_NAME", "BAC Announcements")
         if not _claim_slot(report_date, recipients):
+            _log_if_idle(report_date, today)
             return 0
 
     try:
@@ -1085,6 +1130,14 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
         logger.info("Attached: %s", [n for n, _, _ in attachments] or "none")
         _mark_sent(report_date)
         logger.info("Sent to %s", recipients)
+        send_ops_log(
+            "Daily Announcements", "SENT",
+            f"Daily announcements report for {report_date:%a %d %b %Y} sent.",
+            [f"To: {', '.join(recipients)}",
+             f"Rows: {len(ann)} announcements, {len(bm_filings)} board-meeting filings, "
+             f"{len(ec)} event calendar, {len(ca)} corporate actions",
+             f"Attachments: {', '.join(n for n, _, _ in attachments) or 'none'}"],
+        )
 
         # Issue 21 (scaffold): record today's headline counts for trailing avgs.
         try:
@@ -1113,7 +1166,14 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
     except Exception as exc:  # noqa: BLE001
         logger.exception("Report failed")
         if not preview_mode:
-            _mark_failed(report_date, f"{type(exc).__name__}: {exc}")
+            err = f"{type(exc).__name__}: {exc}"
+            _mark_failed(report_date, err)
+            send_ops_log(
+                "Daily Announcements", "FAILED",
+                f"Daily announcements report for {report_date:%a %d %b %Y} FAILED — "
+                f"nothing was sent to the desk. The fallback triggers will retry.",
+                [err[:1500]],
+            )
         return 1
 
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-28 — 08:00 send and operator log emails
+
+- The report now goes out at **08:00 IST** (was 10:00), **Mon–Sat**. Fallback
+  GHA schedules moved to 08:00 / 08:30 / 09:00. cron-job.org, the primary
+  trigger, must be moved to 08:00 Mon–Sat separately.
+- **`reports/ops_log.py`** (new, shared with the deals pipeline): every run that
+  does something emails a one-line log to parv.bangar@brindco.com only — SENT,
+  FAILED (with the error), or NOT SENT on Mondays / after a holiday, when the
+  latest session was already reported. The recipient is fixed in code, never
+  read from REPORT_RECIPIENTS. Duplicate triggers stay silent.
+- A workflow `if: failure()` step sends the log when the job dies before the
+  report step can (pip, checkout, missing secret).
+
 ## 2026-08-20 — Adopt the BAC house design system
 
 The announcements email rendered its own parchment/burgundy newspaper style with
