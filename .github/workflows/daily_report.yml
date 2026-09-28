@@ -1,27 +1,36 @@
 name: NSE Daily Announcements Report
 
-# Runs once per trading-day morning (Tue–Sat) at 10:00 IST.
+# Runs once per morning at 08:00 IST, Mon–Sat. No re-checks — unlike the deals
+# report, announcements do not arrive late for the previous session.
 # Scrapes the latest data then sends the daily email report.
 #
-# Primary trigger: cron-job.org fires workflow_dispatch at 04:30 UTC (10:00 IST).
+# Primary trigger: cron-job.org fires workflow_dispatch at 02:30 UTC (08:00 IST).
 # The three GHA schedules below are fallbacks — _claim_slot() idempotency
 # ensures only one email is sent even if multiple triggers fire close together.
 #
-# Intraday data collection is handled separately by scrape.yml (5× per day).
+# Every run emails a one-line operator log to parv.bangar@brindco.com only
+# (reports/ops_log.py): sent, failed, or — Mondays and the day after a holiday,
+# when the latest session was already reported — "not sent".
+#
+# Intraday data collection is handled separately by scrape.yml (5x per day).
 
 on:
   schedule:
-    - cron: "30 4 * * 2-6"   # 04:30 UTC = 10:00 IST — primary GHA fallback
-    - cron: "00 5 * * 2-6"   # 05:00 UTC = 10:30 IST — 30-min fallback
-    - cron: "30 5 * * 2-6"   # 05:30 UTC = 11:00 IST — 1-hour fallback
+    - cron: "30 2 * * 1-6"   # 02:30 UTC = 08:00 IST — primary GHA fallback
+    - cron: "00 3 * * 1-6"   # 03:00 UTC = 08:30 IST — 30-min fallback
+    - cron: "30 3 * * 1-6"   # 03:30 UTC = 09:00 IST — 1-hour fallback
   workflow_dispatch:
+
+concurrency:
+  group: daily-announcements-report
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: "3.11"
 
 jobs:
   scrape-and-report:
-    name: "10:00 IST daily announcements report"
+    name: "08:00 IST daily announcements report"
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -83,6 +92,19 @@ jobs:
           REPORT_SENDER_NAME:  ${{ vars.REPORT_SENDER_NAME || 'BAC Announcements' }}
           SLACK_WEBHOOK_URL:   ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python -m reports.daily_announcements_report
+
+      # Python logs its own outcomes, including a report that raised. This covers
+      # the job dying before Python could (checkout, pip, a missing secret).
+      - name: Email operator log if the job failed
+        if: failure()
+        env:
+          SMTP_USER:     ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: >
+          python3 -m reports.ops_log --if-not-sent --report "Daily Announcements"
+          --status FAILED
+          --headline "The daily announcements workflow failed before the report step could report. Nothing was sent to the desk from this run."
+          --detail "Trigger: ${{ github.event_name }}"
 
       - name: Upload logs on failure
         if: failure()
