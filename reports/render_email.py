@@ -347,7 +347,7 @@ def build_email_html(
 
     # ── Masthead ─────────────────────────────────────────────────────────────
     body += d.masthead(
-        kicker="Brindco Alpha Capital &middot; Quant Desk",
+        kicker="RAAS Research Capital &middot; Quant Desk",
         title="Daily Announcements",
         dateline=f"{report_date.strftime('%a %d-%b-%Y')} &middot; Focus edition",
         subline=(

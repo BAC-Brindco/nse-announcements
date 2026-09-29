@@ -101,7 +101,7 @@ def build_full_tables_html(assembly, generated_at: datetime | None = None) -> st
     src = f"NSE corporate filings &middot; as of {rd.strftime('%a %d-%b-%Y')}"
 
     body = d.masthead(
-        kicker="Brindco Alpha Capital &middot; Quant Desk",
+        kicker="RAAS Research Capital &middot; Quant Desk",
         title="Daily Announcements",
         dateline=f"{rd.strftime('%a %d-%b-%Y')} &middot; Complete tables",
         subline=(

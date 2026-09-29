@@ -739,7 +739,7 @@ def _build_slack_blocks(
     blocks.append({"type": "header", "text": {"type": "plain_text",
         "text": f"Daily Announcements — NSE — {report_date.strftime('%d %b %Y')}"}})
     blocks.append({"type": "context", "elements": [{"type": "mrkdwn",
-        "text": "Brindco Alpha Capital  ◆  _a daily note from the quant desk_"}]})
+        "text": "RAAS Research Capital  ◆  _a daily note from the quant desk_"}]})
     blocks.append({"type": "divider"})
 
     blocks.append({"type": "section", "fields": [
