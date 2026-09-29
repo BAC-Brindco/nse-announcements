@@ -177,7 +177,7 @@ def build_full_tables_html(assembly, generated_at: datetime | None = None) -> st
             pad=f"0 {d.PAD_X}px 0 {d.PAD_X}px",
         )
 
-    title = f"BAC Announcements — NSE — {rd.strftime('%d %b %Y')} — Full Tables"
+    title = f"RAAS Announcements — NSE — {rd.strftime('%d %b %Y')} — Full Tables"
 
     # Times New Roman does not exist on Linux, so a CI-rendered PDF would fall
     # back to whatever serif fontconfig picks and reflow against the local

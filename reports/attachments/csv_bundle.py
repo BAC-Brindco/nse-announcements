@@ -117,7 +117,7 @@ def build_csv_bundle(assembly) -> bytes:
 def _readme(assembly) -> str:
     d = assembly.report_date
     lines = [
-        f"BAC Announcements — NSE — {d.strftime('%d %b %Y')}",
+        f"RAAS Announcements — NSE — {d.strftime('%d %b %Y')}",
         "",
         "Complete, unfiltered section data. The email body renders a curated",
         "subset; every row filtered out of the body is present here.",
@@ -133,7 +133,7 @@ def _readme(assembly) -> str:
         "",
         "Derived columns:",
         "  index_membership  NIFTY50 / NIFTY100 / blank",
-        "  is_coverage       Y when the symbol is in the BAC active coverage book",
+        "  is_coverage       Y when the symbol is in the RAAS active coverage book",
         "  is_sme            Y for the SME segment",
         "",
         "Source: NSE corporate filings (announcements, event calendar,",

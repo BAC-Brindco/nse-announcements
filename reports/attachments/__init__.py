@@ -31,7 +31,7 @@ def build_attachments(assembly, generated_at=None) -> list[tuple[str, bytes, str
 
     if cfg.pdf_enabled:
         try:
-            name = f"BAC Announcements — NSE — {d.strftime('%d %b %Y')} — Full Tables.pdf"
+            name = f"RAAS Announcements — NSE — {d.strftime('%d %b %Y')} — Full Tables.pdf"
             out.append((name, build_pdf(assembly, generated_at=generated_at), "application/pdf"))
         except Exception as exc:  # noqa: BLE001
             logger.warning("PDF attachment skipped (%s: %s)", type(exc).__name__, exc)

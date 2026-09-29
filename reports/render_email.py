@@ -1,5 +1,5 @@
 """
-Presentation for the daily announcements email, in the BAC house style.
+Presentation for the daily announcements email, in the RAAS house style.
 
 Everything here renders through ``reports/design.py`` — the same module the
 daily deals report uses — so the two emails are the same document family rather
@@ -54,7 +54,7 @@ def seg_badge(segment: str) -> str:
 
 
 def coverage_mark(symbol: str) -> str:
-    """The ✦ that marks a BAC coverage name."""
+    """The ✦ that marks a RAAS coverage name."""
     if not U.is_coverage(symbol):
         return ""
     return f'<span style="color:{d.GOLD};font-weight:bold;">&#10022;</span>&nbsp;'
@@ -268,7 +268,7 @@ def sast_table(rows, *, cap=None) -> str:
     return d.datatable(
         ["Symbol", "Disclosure"], body, align=["l", "l"], widths=[132, 0],
         title="SAST Reg 31(4) &middot; coverage touchpoints",
-        empty="None touching the BAC / NIFTY universe today.",
+        empty="None touching the RAAS / NIFTY universe today.",
     )
 
 
@@ -374,7 +374,7 @@ def build_email_html(
     # is the single canonical one.
     coverage_body = f"{coverage_active}<br /><br />{coverage_pillar}"
     body += d.row(
-        d.callout(coverage_body, accent="navy", title="BAC coverage touchpoints"),
+        d.callout(coverage_body, accent="navy", title="RAAS coverage touchpoints"),
         pad=d.BLOCK_PAD,
     )
 
@@ -477,14 +477,14 @@ def build_email_html(
     if attachment_note:
         provenance += f" {attachment_note}"
     disclaimer = (
-        "The body is scoped to the BAC coverage book, the NIFTY50/100 overlay and "
+        "The body is scoped to the RAAS coverage book, the NIFTY50/100 overlay and "
         "the NIFTY500; every filtered row is carried in full by the attachments. "
         "For information only — not investment advice. Write to bac@brindco.com "
         "with corrections."
     )
     body += d.row(d.colophon(provenance, disclaimer), pad="26px 24px 26px 24px")
 
-    title = f"BAC Announcements — NSE — {report_date.strftime('%d %b %Y')}"
+    title = f"RAAS Announcements — NSE — {report_date.strftime('%d %b %Y')}"
     preheader = (
         f"{assembly.counts.get('equity_filings', 0)} filings · "
         f"{sec_bm.n_all} board meetings · {sec_ca.n_all} corporate actions"

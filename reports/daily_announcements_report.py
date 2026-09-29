@@ -10,7 +10,7 @@ The email is a curated focus edition; the complete data ships as a PDF and a
 CSV bundle. Responsibilities are split three ways:
 
   reports/assembly.py      which rows appear   (rows_body vs rows_all)
-  reports/render_email.py  how they look       (BAC house style, design.py)
+  reports/render_email.py  how they look       (RAAS house style, design.py)
   this module              fetch, orchestrate, dispatch
 
 Styling belongs in reports/design.py — the same module the daily deals report
@@ -28,11 +28,11 @@ Env vars:
   SUPABASE_URL, SUPABASE_KEY
   SMTP_USER, SMTP_PASSWORD
   REPORT_RECIPIENTS   — one address: bac-reports@brindco.com, the Google Group
-                        that is the single recipient list shared by all three BAC
+                        that is the single recipient list shared by all three RAAS
                         daily reports (this one, nse-pipeline's deals report and
                         the morning brief). Readers are added in Google Workspace,
                         not by editing this secret in three repositories.
-  REPORT_SENDER_NAME  (optional, default "BAC Announcements")
+  REPORT_SENDER_NAME  (optional, default "RAAS Announcements")
   SLACK_WEBHOOK_URL   (optional)
 """
 
@@ -414,7 +414,7 @@ def _editorial_items(
             + (f" ({n_sme} SME)" if n_sme else "")
             + f"; <strong>{n_engage}</strong> engagement.")
     if covered:
-        body += (" BAC coverage active: "
+        body += (" RAAS coverage active: "
                  + ", ".join(f"<strong>{_e(s)}</strong>" for s in covered[:5]) + ".")
     items.append(("Yesterday&#8217;s filings &mdash;", body))
     return items
@@ -457,7 +457,7 @@ def _coverage_prose(assembly, bm_filings, ec, ca) -> tuple[str, str]:
     active = (
         "<strong>Active coverage on the tape:</strong> " + ", ".join(hits) + "."
         if hits else
-        "<strong>Active coverage on the tape:</strong> the BAC active universe is "
+        "<strong>Active coverage on the tape:</strong> the RAAS active universe is "
         "silent today."
     )
 
@@ -599,7 +599,7 @@ def _scope_note(assembly) -> str:
     total_all = sum(s.n_all for s in assembly.sections.values())
     total_body = sum(s.n_body for s in assembly.sections.values())
     return (
-        f"Scoped to the BAC coverage book, the NIFTY50/100 overlay and the "
+        f"Scoped to the RAAS coverage book, the NIFTY50/100 overlay and the "
         f"NIFTY500. {total_body} of today&#8217;s {total_all:,} rows are shown "
         f"below; the complete record is attached as a PDF and a CSV bundle."
     )
@@ -803,7 +803,7 @@ def _build_slack_blocks(
 def _send_slack(webhook_url: str, blocks: list[dict], report_date: date) -> None:
     import json
     payload = json.dumps({
-        "text":   f"BAC Daily Announcements — NSE — {report_date.strftime('%d %b %Y')}",
+        "text":   f"RAAS Daily Announcements — NSE — {report_date.strftime('%d %b %Y')}",
         "blocks": blocks,
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -1068,7 +1068,7 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
         smtp_user     = _env("SMTP_USER")
         smtp_password = _env("SMTP_PASSWORD")
         recipients    = [r.strip() for r in _env("REPORT_RECIPIENTS").split(",") if r.strip()]
-        sender_name   = os.environ.get("REPORT_SENDER_NAME", "BAC Announcements")
+        sender_name   = os.environ.get("REPORT_SENDER_NAME", "RAAS Announcements")
         if not _claim_slot(report_date, recipients):
             _log_if_idle(report_date, today)
             return 0
@@ -1123,7 +1123,7 @@ def main(report_date_override: date | None = None, preview_path: str | None = No
         _send_email(
             sender=smtp_user, password=smtp_password, sender_name=sender_name,
             recipients=recipients,
-            subject=f"BAC Announcements — NSE — {pretty_date}",
+            subject=f"RAAS Announcements — NSE — {pretty_date}",
             html=html,
             attachments=attachments,
         )
